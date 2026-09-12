@@ -284,15 +284,39 @@ few or no features, because it has nothing to control. That is itself a useful
 test: the app should connect and show each control as unavailable with a
 reason, rather than pretending it works.
 
-## Installing the backend
+## Trying the driver without changing anything
+
+Preferred for a first test. Loads the driver into memory only — no persistent
+system settings are modified.
+
+```bash
+sudo ./scripts/try-driver.sh                   # terminal 1
+sudo ./scripts/run-daemon-dev.sh               # terminal 2
+node scripts/probe.ts && npm start             # terminal 3
+sudo ./scripts/try-driver.sh --undo            # when finished
+```
+
+It writes nothing under `/etc`, `/opt` or `/lib/modules`, installs no systemd
+unit, runs no `depmod`, creates no group, and never touches Secure Boot. A
+reboot clears it regardless. `acer_wmi` is unloaded while it runs, since
+`linuwu_sense` replaces it; `--undo` restores it.
+
+## Installing the backend permanently
 
 Full hardware control needs the Linuwu-Sense kernel driver and the DAMX
 daemon. Neither ships in this repository as a build.
+
+Only once the temporary load above is confirmed working. This one does change
+persistent settings — module in `/lib/modules`, `acer_wmi` blacklisted,
+`nitro_v4` in `/etc/modprobe.d`, a systemd unit, and a group.
 
 ```bash
 sudo ./scripts/setup-backend.sh          # driver + nitro_v4 + daemon service
 sudo ./scripts/setup-backend.sh --uninstall
 ```
+
+Neither script touches Secure Boot: they read its state and warn, and never
+sign a module or enrol a key.
 
 It uses **PXDiv/Div-Linuwu-Sense**, which the project README credits. The
 original `0x7375646F/Linuwu-Sense` lacks the `enable_all` module parameter the
