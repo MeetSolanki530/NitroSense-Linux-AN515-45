@@ -129,8 +129,16 @@ export function Internals({ connection, refresh }: Props): JSX.Element {
     }
   };
 
-  const suggestNitro =
-    state !== null && !state.modprobeParameter && state.features.length < 10;
+  // get_modprobe_parameter only reflects /etc/modprobe.d, never a parameter
+  // that is active in memory via a plain insmod — the daemon has no way to
+  // see that. So an empty modprobeParameter does not mean "nothing is
+  // working"; it can equally mean "working right now, but not persisted."
+  // Use feature count to tell those apart: 1 feature (thermal_profile only)
+  // is the genuine "driver could not detect this model" case; more than
+  // that means some parameter is already active, just not saved.
+  const genuinelyIncomplete = state !== null && state.features.length <= 1;
+  const activeButNotPersisted =
+    state !== null && !state.modprobeParameter && state.features.length > 1;
 
   return (
     <div className="internals-view">
@@ -166,13 +174,25 @@ export function Internals({ connection, refresh }: Props): JSX.Element {
           </p>
         )}
 
-        {suggestNitro && (
+        {genuinelyIncomplete && (
           <div className="suggest">
             <strong>Features look incomplete and no parameter is set.</strong>
             <p>
               On AN515-series hardware this is usually resolved by forcing
               <code> nitro_v4</code>. Try it temporarily first; make it permanent once
               you have confirmed it helps.
+            </p>
+          </div>
+        )}
+
+        {activeButNotPersisted && (
+          <div className="suggest suggest-info">
+            <strong>A driver parameter is active for this session, but not saved.</strong>
+            <p>
+              These {state?.features.length} features are working right now because a
+              parameter was loaded temporarily (<code>insmod</code>, not
+              <code> modprobe.d</code>). It will be lost on the next reboot. Use
+              <code> Set Parameter</code> below to persist it.
             </p>
           </div>
         )}

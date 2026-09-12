@@ -63,15 +63,42 @@ undo() {
     dim "  linuwu_sense was not loaded."
   fi
 
+  # Force a full unload+reload of acer_wmi even if it is already loaded.
+  # acer_wmi's WMI event-notify registration (what turns an Fn-key ACPI event
+  # into an actual input event) is set up at module init. If it was left
+  # loaded from an earlier `undo`, or auto-reloaded stale, that registration
+  # can be incomplete even though the module and its sysfs nodes are present.
+  # A full rmmod+modprobe cycle re-runs init from scratch.
   if module_loaded acer_wmi; then
-    dim "  acer_wmi already loaded."
-  elif modprobe acer_wmi 2>/dev/null; then
-    green "  acer_wmi restored."
+    dim "  acer_wmi is loaded; reloading it fully to reset hotkey notify state."
+    rmmod acer_wmi 2>/dev/null || warn "  Could not unload acer_wmi; it may be pinned by another driver."
+    sleep 1
+  fi
+
+  if modprobe acer_wmi 2>/dev/null; then
+    green "  acer_wmi (re)loaded."
+    # Nudge the platform device to re-enumerate, in case the hotkey input
+    # device was not recreated by modprobe alone.
+    echo change > /sys/devices/platform/acer-wmi/uevent 2>/dev/null || true
   else
-    dim "  acer_wmi not reloaded (it may be built into the kernel)."
+    red "  acer_wmi did not load. Check: dmesg | tail -30"
+  fi
+
+  echo ""
+  if grep -qi "Acer WMI hotkeys" /proc/bus/input/devices 2>/dev/null; then
+    green "  Hotkey input device present (Acer WMI hotkeys)."
+  else
+    warn "  No 'Acer WMI hotkeys' input device found."
   fi
   echo ""
-  dim "  Nothing persistent was ever written, so there is nothing else to undo."
+  warn "  Test Fn keys now. If they still do not respond, the ACPI notify"
+  warn "  handler is stuck in a state that only a reboot clears — this is a"
+  warn "  known limitation of unloading/reloading vendor WMI drivers, not"
+  warn "  something a further module reload can fix. Reboot restores it:"
+  echo "      systemctl reboot"
+  echo ""
+  dim "  Nothing persistent was ever written, so a reboot returns you to the"
+  dim "  exact state you had before any of this."
   echo ""
   exit 0
 }

@@ -35,6 +35,14 @@
 .suggest p { margin: 6px 0 0; line-height: 1.5; }
 .suggest code { font-family: var(--font-display); color: #fff; }
 
+/* Neutral fact, not a warning: driver is fine, just not persisted yet. */
+.suggest-info {
+  border-color: rgba(90, 170, 255, 0.35);
+  background: rgba(90, 170, 255, 0.08);
+  color: #cfe4ff;
+}
+.suggest-info code { color: #fff; }
+
 /* ---- running ---- */
 .running-banner {
   display: flex;
