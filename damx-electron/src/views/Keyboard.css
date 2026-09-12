@@ -40,14 +40,22 @@
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 14px;
 }
-.zone-picker { display: grid; justify-items: center; gap: 7px; }
 .zone-label {
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.zone-picker input[type='color'] {
+
+/* ---- colour field: swatch + typed hex ---- */
+.colour-field { display: grid; justify-items: center; gap: 7px; }
+.colour-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  width: 100%;
+}
+.colour-field input[type='color'] {
   appearance: none;
   width: 100%;
   min-width: 70px;
@@ -58,10 +66,41 @@
   background: none;
   cursor: pointer;
 }
-.zone-picker input[type='color']::-webkit-color-swatch-wrapper { padding: 3px; }
-.zone-picker input[type='color']::-webkit-color-swatch { border: none; border-radius: 2px; }
-.zone-picker input[type='color']:disabled { cursor: not-allowed; opacity: 0.5; }
-.zone-hex { font-family: var(--font-display); font-size: 11.5px; color: var(--text-dim); }
+.colour-field input[type='color']::-webkit-color-swatch-wrapper { padding: 3px; }
+.colour-field input[type='color']::-webkit-color-swatch { border: none; border-radius: 2px; }
+.colour-field input[type='color']:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.hex-input {
+  width: 100%;
+  padding: 5px 8px;
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.hex-input:focus { outline: none; border-color: var(--accent); }
+.hex-input.is-invalid { border-color: var(--danger); color: var(--danger); }
+.hex-input:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.colour-hint { font-size: 11px; line-height: 1.4; text-align: center; }
+
+/* ---- preset swatches ---- */
+.kb-swatches { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.swatch:hover:not(:disabled) { transform: scale(1.15); border-color: var(--text); }
+.swatch:disabled { cursor: not-allowed; opacity: 0.4; }
 
 .kb-row { margin-top: 20px; }
 .kb-row-split {

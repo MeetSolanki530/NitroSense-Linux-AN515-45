@@ -14,6 +14,7 @@
  */
 
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { DamxClient } from './damx-client.ts';
 import { InternalsManager } from './internals.ts';
@@ -29,6 +30,12 @@ const DEV_SERVER = process.env.VITE_DEV_SERVER_URL;
 let mainWindow: BrowserWindow | null = null;
 let services: Services | null = null;
 
+/** Source icon path, present only when running unpackaged. */
+function windowIcon(): string | null {
+  const p = join(APP_DIR, '..', 'build', 'icons', '256x256.png');
+  return existsSync(p) ? p : null;
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -40,6 +47,10 @@ function createWindow(): BrowserWindow {
     // matching the NitroSense chrome.
     frame: false,
     backgroundColor: '#0b0806',
+    // Packaged builds take the taskbar icon from the .desktop entry, but an
+    // unpackaged run (npm start) has no desktop file, so point at the source
+    // icon when it is there.
+    ...(windowIcon() ? { icon: windowIcon() as string } : {}),
     webPreferences: {
       preload: join(APP_DIR, 'preload.cjs'),
       contextIsolation: true,

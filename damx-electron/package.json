@@ -33,5 +33,40 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
-  "main": "dist-electron/main.cjs"
+  "main": "dist-electron/main.cjs",
+  "build": {
+    "appId": "com.divacer.damx",
+    "productName": "DivAcerManagerMax",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icons",
+        "to": "icons"
+      }
+    ],
+    "linux": {
+      "target": [
+        "dir",
+        "deb"
+      ],
+      "category": "System;Settings;HardwareSettings",
+      "icon": "build/icons",
+      "executableName": "DivAcerManagerMax",
+      "desktop": {
+        "Name": "Div Acer Manager Max",
+        "Comment": "Fan, power, battery and keyboard control for Acer Nitro laptops",
+        "Categories": "System;Settings;HardwareSettings;",
+        "Keywords": "acer;nitro;fan;rgb;battery;nitrosense;",
+        "StartupWMClass": "DivAcerManagerMax"
+      }
+    }
+  }
 }

@@ -14,7 +14,8 @@ import { ControlBlock, Slider, gateFor } from '../components/Control';
 import { useCommand } from '../state/useCommand';
 import {
   DEFAULT_FOUR_ZONE, DEFAULT_PER_ZONE, DIRECTIONS, EFFECTS, effectFor,
-  hexToRgb, parseFourZone, parsePerZone, rgbToHex, usesAnimation, usesColour, usesDirection,
+  hexToRgb, normaliseHex, parseFourZone, parsePerZone, rgbToHex,
+  usesAnimation, usesColour, usesDirection,
 } from '../state/keyboard';
 import type { FourZone, PerZone } from '../state/keyboard';
 import type { ConnectionState, Settings } from '../state/damx';
@@ -28,6 +29,79 @@ type Props = {
 };
 
 const ZONE_NAMES = ['Zone 1', 'Zone 2', 'Zone 3', 'Zone 4'];
+
+const PRESETS: { name: string; hex: string }[] = [
+  { name: 'Red', hex: 'ff0000' },
+  { name: 'Orange', hex: 'ff6a00' },
+  { name: 'Yellow', hex: 'ffd000' },
+  { name: 'Green', hex: '00ff2f' },
+  { name: 'Cyan', hex: '00e5ff' },
+  { name: 'Blue', hex: '0033ff' },
+  { name: 'Magenta', hex: 'ff00d0' },
+  { name: 'White', hex: 'ffffff' },
+];
+
+/**
+ * Colour swatch plus a typed hex value.
+ *
+ * The swatch alone was not enough: it opens the desktop's picker but shows no
+ * readable value, so a colour that came back from the driver as 0,0,0 just
+ * looked like an empty black box. The hex field makes the current value
+ * visible and lets it be entered directly.
+ */
+function ColourField({
+  label, hex, disabled, hint, onChange,
+}: {
+  label: string;
+  hex: string;
+  disabled?: boolean;
+  hint?: string;
+  onChange: (hex: string) => void;
+}): JSX.Element {
+  const [draft, setDraft] = useState(hex);
+  // Follow the hardware value unless the field is being typed into.
+  const [typing, setTyping] = useState(false);
+  useEffect(() => { if (!typing) setDraft(hex); }, [hex, typing]);
+
+  const valid = normaliseHex(draft) !== null;
+
+  return (
+    <div className="colour-field">
+      <span className="zone-label">{label}</span>
+      <div className="colour-row">
+        <input
+          type="color"
+          value={`#${hex}`}
+          disabled={disabled}
+          onChange={(e) => {
+            const v = normaliseHex(e.target.value);
+            if (v) onChange(v);
+          }}
+          aria-label={`${label} colour`}
+        />
+        <input
+          type="text"
+          className={`hex-input${valid ? '' : ' is-invalid'}`}
+          value={draft}
+          disabled={disabled}
+          spellCheck={false}
+          maxLength={7}
+          inputMode="text"
+          aria-label={`${label} hex value`}
+          aria-invalid={!valid}
+          onFocus={() => setTyping(true)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const v = normaliseHex(e.target.value);
+            if (v) onChange(v);
+          }}
+          onBlur={() => { setTyping(false); setDraft(hex); }}
+        />
+      </div>
+      {hint && <span className="colour-hint dim">{hint}</span>}
+    </div>
+  );
+}
 
 export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Element {
   const connected = connection === 'connected';
@@ -47,11 +121,19 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
     if (parsed) setPerZone(parsed);
   }, [settings?.per_zone_mode, dirty.perZone]);
 
+  // The firmware reports 0,0,0 for effects that generate their own colours,
+  // and after any per-zone write. Adopting that verbatim blanks the picker to
+  // black, which reads as "no colour set" when the keyboard is in fact lit.
+  // Fall back to the colour actually on the keyboard: zone 1.
+  const zone1 = perZone.zones[0];
   useEffect(() => {
     if (dirty.fourZone) return;
     const parsed = parseFourZone(settings?.four_zone_mode);
-    if (parsed) setFourZone(parsed);
-  }, [settings?.four_zone_mode, dirty.fourZone]);
+    if (!parsed) return;
+    const blank = parsed.red === 0 && parsed.green === 0 && parsed.blue === 0;
+    const fallback = blank ? hexToRgb(zone1) : null;
+    setFourZone(fallback ? { ...parsed, ...fallback } : parsed);
+  }, [settings?.four_zone_mode, dirty.fourZone, zone1]);
 
   const editZone = (index: number, hex: string): void => {
     setDirty((d) => ({ ...d, perZone: true }));
@@ -117,17 +199,32 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
       >
         <div className="zone-grid">
           {perZone.zones.map((hex, i) => (
-            <div className="zone-picker" key={i}>
-              <span className="zone-label">{ZONE_NAMES[i]}</span>
-              <input
-                type="color"
-                value={`#${hex}`}
-                disabled={!perZoneGate.ok || busy}
-                onChange={(e) => editZone(i, e.target.value)}
-                aria-label={`${ZONE_NAMES[i]} colour`}
-              />
-              <code className="zone-hex">#{hex}</code>
-            </div>
+            <ColourField
+              key={i}
+              label={ZONE_NAMES[i] as string}
+              hex={hex}
+              disabled={!perZoneGate.ok || busy}
+              onChange={(v) => editZone(i, v)}
+            />
+          ))}
+        </div>
+
+        <div className="kb-actions kb-swatches">
+          <span className="zone-label">Quick set</span>
+          {PRESETS.map((p) => (
+            <button
+              key={p.hex}
+              type="button"
+              className="swatch"
+              style={{ background: `#${p.hex}` }}
+              title={p.name}
+              aria-label={`Set every zone to ${p.name}`}
+              disabled={!perZoneGate.ok || busy}
+              onClick={() => {
+                setDirty((d) => ({ ...d, perZone: true }));
+                setPerZone((z) => ({ ...z, zones: [p.hex, p.hex, p.hex, p.hex] }));
+              }}
+            />
           ))}
         </div>
 
@@ -182,24 +279,18 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
         {effect?.note && <p className="effect-note dim">{effect.note}</p>}
 
         <div className="kb-row kb-row-split">
-          <div className="zone-picker">
-            <span className="zone-label">Colour</span>
-            <input
-              type="color"
-              value={`#${fourZoneHex}`}
-              disabled={!fourZoneGate.ok || busy || !coloured}
-              onChange={(e) => {
-                const rgb = hexToRgb(e.target.value);
-                if (!rgb) return;
-                setDirty((d) => ({ ...d, fourZone: true }));
-                setFourZone((f) => ({ ...f, ...rgb }));
-              }}
-              aria-label="Effect colour"
-            />
-            <code className="zone-hex">
-              {coloured ? `#${fourZoneHex}` : 'n/a'}
-            </code>
-          </div>
+          <ColourField
+            label="Colour"
+            hex={fourZoneHex}
+            disabled={!fourZoneGate.ok || busy || !coloured}
+            hint={coloured ? undefined : 'This effect picks its own colours.'}
+            onChange={(v) => {
+              const rgb = hexToRgb(v);
+              if (!rgb) return;
+              setDirty((d) => ({ ...d, fourZone: true }));
+              setFourZone((f) => ({ ...f, ...rgb }));
+            }}
+          />
 
           <Slider
             label="Brightness"
