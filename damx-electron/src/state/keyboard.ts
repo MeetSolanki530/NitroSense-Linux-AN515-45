@@ -17,6 +17,9 @@
  * (facer, Acer-SenSe) stops at 5.
  */
 
+/** Mid-range, matching what the effect tiles start on. */
+export const DEFAULT_EFFECT_SPEED = 5;
+
 export type PerZone = { zones: [string, string, string, string]; brightness: number };
 
 export type FourZone = {
@@ -63,6 +66,20 @@ export const EFFECTS: Effect[] = [
 
 export function effectFor(mode: number): Effect {
   return EFFECTS.find((e) => e.mode === mode) ?? (EFFECTS[0] as Effect);
+}
+
+/**
+ * Keep an animated effect from being applied at speed 0.
+ *
+ * Static is stored with speed 0 — correctly, it has no animation — and the
+ * driver writes that 0 back, so it is what the next read returns. Carrying it
+ * into Breathing or Wave asks the firmware to animate at zero speed, which
+ * parks the keyboard at the dark end of the cycle and is indistinguishable
+ * from the effect not working.
+ */
+export function withUsableSpeed(fz: FourZone): FourZone {
+  if (!usesAnimation(fz.mode) || fz.speed > 0) return fz;
+  return { ...fz, speed: DEFAULT_EFFECT_SPEED };
 }
 
 export const DIRECTIONS: { value: number; label: string }[] = [
@@ -153,5 +170,6 @@ export const DEFAULT_PER_ZONE: PerZone = {
 };
 
 export const DEFAULT_FOUR_ZONE: FourZone = {
-  mode: 0, speed: 5, brightness: 100, direction: 1, red: 255, green: 106, blue: 0,
+  mode: 0, speed: DEFAULT_EFFECT_SPEED, brightness: 100, direction: 1,
+  red: 255, green: 106, blue: 0,
 };

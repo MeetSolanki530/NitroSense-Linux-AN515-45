@@ -15,7 +15,7 @@ import { useCommand } from '../state/useCommand';
 import {
   DEFAULT_FOUR_ZONE, DEFAULT_PER_ZONE, DIRECTIONS, EFFECTS, effectFor,
   hexToRgb, normaliseHex, parseFourZone, parsePerZone, rgbToHex,
-  usesAnimation, usesColour, usesDirection,
+  usesAnimation, usesColour, usesDirection, withUsableSpeed,
 } from '../state/keyboard';
 import type { FourZone, PerZone } from '../state/keyboard';
 import type { ConnectionState, Settings } from '../state/damx';
@@ -150,8 +150,15 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
   };
 
   const applyFourZone = (): void => {
-    void run(() => window.damx.setFourZoneMode({ ...fourZone }))
-      .then((ok) => { if (ok) setDirty((d) => ({ ...d, fourZone: false })); });
+    // Guard the write as well as the tile click, so a speed 0 that arrived
+    // from the hardware read cannot be applied to an animated effect.
+    const payload = withUsableSpeed(fourZone);
+    void run(() => window.damx.setFourZoneMode({ ...payload }))
+      .then((ok) => {
+        if (!ok) return;
+        setFourZone(payload);
+        setDirty((d) => ({ ...d, fourZone: false }));
+      });
   };
 
   const effect = effectFor(fourZone.mode);
@@ -268,7 +275,9 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
               aria-pressed={fourZone.mode === e.mode}
               onClick={() => {
                 setDirty((d) => ({ ...d, fourZone: true }));
-                setFourZone((f) => ({ ...f, mode: e.mode }));
+                // Switching off Static must not carry its speed 0 along:
+                // an animated effect at speed 0 does not animate at all.
+                setFourZone((f) => withUsableSpeed({ ...f, mode: e.mode }));
               }}
             >
               {e.name}

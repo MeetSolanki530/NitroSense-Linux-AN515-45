@@ -5,8 +5,9 @@
  *   four_zone_mode "mode,speed,brightness,direction,red,green,blue"
  */
 import {
-  EFFECTS, effectFor, hexToRgb, normaliseHex, parseFourZone, parsePerZone,
-  rgbToHex, usesAnimation, usesColour, usesDirection,
+  DEFAULT_EFFECT_SPEED, EFFECTS, effectFor, hexToRgb, normaliseHex,
+  parseFourZone, parsePerZone, rgbToHex, usesAnimation, usesColour,
+  usesDirection, withUsableSpeed,
 } from '../src/state/keyboard.ts';
 
 let passed = 0;
@@ -58,6 +59,22 @@ check('mode 5 is Zoom', EFFECTS[5]?.name === 'Zoom');
 check('Static ignores speed', usesAnimation(0) === false);
 check('Breathing uses speed', usesAnimation(1) === true);
 check('Neon uses speed', usesAnimation(2) === true);
+
+console.log('\n4b. An animated effect is never applied at speed 0');
+// Static is stored with speed 0 and the driver writes that back, so it is
+// what the next read returns. Carrying it into an animated effect asks the
+// firmware to animate at zero speed, which looks exactly like a dead effect.
+const fromStatic = { mode: 0, speed: 0, brightness: 100, direction: 1,
+                     red: 255, green: 0, blue: 0 };
+check('static keeps speed 0', withUsableSpeed(fromStatic).speed === 0);
+check('breathing inherits a usable speed',
+  withUsableSpeed({ ...fromStatic, mode: 1 }).speed === DEFAULT_EFFECT_SPEED);
+check('wave inherits a usable speed',
+  withUsableSpeed({ ...fromStatic, mode: 3 }).speed === DEFAULT_EFFECT_SPEED);
+check('a speed the user chose is left alone',
+  withUsableSpeed({ ...fromStatic, mode: 1, speed: 2 }).speed === 2);
+check('nothing else is altered',
+  withUsableSpeed({ ...fromStatic, mode: 1 }).red === 255);
 check('Shifting uses speed', usesAnimation(4) === true);
 
 check('Wave uses direction', usesDirection(3) === true);
