@@ -1,0 +1,146 @@
+.performance { display: grid; gap: 18px; align-content: start; }
+
+.write-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 74, 43, 0.12);
+  border: 1px solid rgba(255, 74, 43, 0.4);
+  border-radius: var(--radius);
+  color: #ff9d86;
+  font-size: 12.5px;
+}
+.write-error button {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.control-block.is-disabled .control-body { opacity: 0.45; pointer-events: none; }
+.control-head { display: flex; align-items: baseline; gap: 12px; }
+.control-head .panel-title { margin-bottom: 14px; }
+.control-reason {
+  margin-left: auto;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--warn);
+  border: 1px solid rgba(255, 166, 30, 0.35);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.control-hint { font-size: 11.5px; margin: 12px 0 0; line-height: 1.5; }
+
+/* ---- mode tiles ---- */
+.mode-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.mode-tile {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  padding: 20px 12px 16px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.mode-tile:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text); }
+.mode-tile:disabled { cursor: not-allowed; }
+
+.mode-tile.is-selected {
+  color: #fff;
+  border-color: var(--accent);
+  background: linear-gradient(160deg, var(--accent), rgba(0, 0, 0, 0.25));
+  box-shadow: var(--glow);
+}
+
+.mode-tile-label {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.mode-tile-raw {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  opacity: 0.65;
+  font-family: var(--font-body);
+}
+
+/* ---- fan ---- */
+.fan-mode { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.seg {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 8px 20px;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.seg:hover:not(:disabled) { color: var(--text); }
+.seg-active { background: var(--accent); color: #fff; }
+.seg:disabled { cursor: not-allowed; opacity: 0.6; }
+
+.fan-sliders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+  transition: opacity 0.15s ease;
+}
+.fan-sliders.is-muted { opacity: 0.45; }
+
+.slider-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+.slider-label { font-size: 11.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-muted); }
+.slider-value { font-size: 15px; font-weight: 700; color: var(--text); }
+
+.slider input[type='range'] {
+  appearance: none;
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0 var(--fill, 0%),
+    rgba(255, 255, 255, 0.1) var(--fill, 0%) 100%
+  );
+  cursor: pointer;
+}
+.slider input[type='range']:disabled { cursor: not-allowed; }
+.slider input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  border: 2px solid var(--bg-base);
+  box-shadow: var(--glow);
+}
+
+.fan-live {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.readout { display: grid; gap: 2px; }
+.readout-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.readout-value { font-size: 17px; font-weight: 700; color: var(--accent-bright); }

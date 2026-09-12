@@ -18,6 +18,10 @@ import type { DamxResponse } from './damx-client.ts';
 import { InternalsManager } from './internals.ts';
 import type { ModprobeParam } from './internals.ts';
 import { TelemetryPoller } from './telemetry.ts';
+import {
+  bool, fourZoneConfig, intInRange, modprobeParam, nonEmptyString,
+  usbChargingLevel, zoneColors,
+} from './validate.ts';
 import type { Telemetry } from './telemetry.ts';
 
 export const CH = {
@@ -26,38 +30,6 @@ export const CH = {
   state: 'damx:state',
   connection: 'damx:connection',
 } as const;
-
-class ValidationError extends Error {}
-
-const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
-
-function intInRange(v: unknown, lo: number, hi: number, label: string): number {
-  if (!isInt(v) || v < lo || v > hi) {
-    throw new ValidationError(`${label} must be an integer between ${lo} and ${hi} (got ${String(v)})`);
-  }
-  return v;
-}
-
-function bool(v: unknown, label: string): boolean {
-  if (typeof v !== 'boolean') throw new ValidationError(`${label} must be a boolean (got ${String(v)})`);
-  return v;
-}
-
-function hexColor(v: unknown, label: string): string {
-  if (typeof v !== 'string' || !/^[0-9a-fA-F]{6}$/.test(v)) {
-    throw new ValidationError(`${label} must be a 6-digit hex colour like "ff6a00" (got ${String(v)})`);
-  }
-  return v.toLowerCase();
-}
-
-const MODPROBE_PARAMS: ReadonlySet<string> = new Set(['nitro_v4', 'predator_v4', 'enable_all']);
-
-function modprobeParam(v: unknown): ModprobeParam {
-  if (typeof v !== 'string' || !MODPROBE_PARAMS.has(v)) {
-    throw new ValidationError(`parameter must be one of ${[...MODPROBE_PARAMS].join(', ')}`);
-  }
-  return v as ModprobeParam;
-}
 
 export type Services = {
   client: DamxClient;
@@ -82,16 +54,13 @@ const HANDLERS: Record<string, Handler> = {
 
   // ---- thermal / fan ----
   setThermalProfile: async ({ client }, a) => {
-    const profile = a.profile;
-    if (typeof profile !== 'string' || profile.length === 0) {
-      throw new ValidationError('profile must be a non-empty string');
-    }
+    const profile = nonEmptyString(a.profile, 'profile');
     // The daemon only accepts values the kernel reports, so check against the
     // live list rather than a hardcoded set.
     const current = unwrap(await client.send('get_thermal_profile')) as { available?: string[] };
     const available = current?.available ?? [];
     if (available.length > 0 && !available.includes(profile)) {
-      throw new ValidationError(`profile must be one of ${available.join(', ')} (got "${profile}")`);
+      throw new Error(`profile must be one of ${available.join(', ')} (got "${profile}")`);
     }
     return unwrap(await client.send('set_thermal_profile', { profile }));
   },
@@ -117,43 +86,22 @@ const HANDLERS: Record<string, Handler> = {
     unwrap(await client.send('set_lcd_override', { enabled: bool(a.enabled, 'enabled') })),
 
   // ---- usb charging: the daemon accepts only these four levels ----
-  setUsbCharging: async ({ client }, a) => {
-    const level = a.level;
-    if (!isInt(level) || ![0, 10, 20, 30].includes(level)) {
-      throw new ValidationError(`level must be 0, 10, 20 or 30 (got ${String(level)})`);
-    }
-    return unwrap(await client.send('set_usb_charging', { level }));
-  },
+  setUsbCharging: async ({ client }, a) =>
+    unwrap(await client.send('set_usb_charging', { level: usbChargingLevel(a.level) })),
 
   // ---- keyboard rgb ----
   setPerZoneMode: async ({ client }, a) => {
-    const zones = a.zones;
-    if (!Array.isArray(zones) || zones.length !== 4) {
-      throw new ValidationError('zones must be an array of exactly 4 hex colours');
-    }
+    const [zone1, zone2, zone3, zone4] = zoneColors(a.zones);
     return unwrap(
       await client.send('set_per_zone_mode', {
-        zone1: hexColor(zones[0], 'zones[0]'),
-        zone2: hexColor(zones[1], 'zones[1]'),
-        zone3: hexColor(zones[2], 'zones[2]'),
-        zone4: hexColor(zones[3], 'zones[3]'),
+        zone1, zone2, zone3, zone4,
         brightness: intInRange(a.brightness, 0, 100, 'brightness'),
       }),
     );
   },
 
   setFourZoneMode: async ({ client }, a) =>
-    unwrap(
-      await client.send('set_four_zone_mode', {
-        mode: intInRange(a.mode, 0, 7, 'mode'),
-        speed: intInRange(a.speed, 0, 9, 'speed'),
-        brightness: intInRange(a.brightness, 0, 100, 'brightness'),
-        direction: intInRange(a.direction, 1, 2, 'direction'),
-        red: intInRange(a.red, 0, 255, 'red'),
-        green: intInRange(a.green, 0, 255, 'green'),
-        blue: intInRange(a.blue, 0, 255, 'blue'),
-      }),
-    ),
+    unwrap(await client.send('set_four_zone_mode', fourZoneConfig(a))),
 
   // ---- internals: each restarts the daemon, so each returns a feature diff ----
   internalsState: async ({ internals }) => internals.readState(),

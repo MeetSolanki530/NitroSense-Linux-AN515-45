@@ -3,6 +3,7 @@ import { TitleBar } from './components/TitleBar';
 import type { Tab } from './components/TitleBar';
 import { Placeholder } from './views/Placeholder';
 import { Home } from './views/Home';
+import { Performance } from './views/Performance';
 import { useConnection, useSettings, useTelemetry } from './state/damx';
 import './components/TitleBar.css';
 import './App.css';
@@ -18,10 +19,17 @@ const TABS: Tab[] = [
 ];
 
 export function App(): JSX.Element {
-  const [active, setActive] = useState('home');
+  // Deep link: #performance selects that tab on load, which lets headless
+  // captures target a specific view.
+  const initialTab = typeof location !== 'undefined' && location.hash
+    ? location.hash.replace('#', '')
+    : 'home';
+  const [active, setActive] = useState(
+    TABS.some((t) => t.id === initialTab) ? initialTab : 'home',
+  );
   const connection = useConnection();
   const telemetry = useTelemetry();
-  const { settings, error, has } = useSettings();
+  const { settings, error, has, refresh } = useSettings();
 
   // Mode drives the accent colour app-wide (red at Performance, amber at
   // Balanced), matching the screenshots.
@@ -54,8 +62,8 @@ export function App(): JSX.Element {
       <main className="app-body">
         {active === 'home' && <Home telemetry={telemetry} settings={settings} has={has} />}
         {active === 'performance' && (
-          <Placeholder title="Performance" step="step 6" has={has}
-            requires={['thermal_profile', 'fan_speed']} />
+          <Performance settings={settings} telemetry={telemetry} has={has}
+            connection={connection} refresh={refresh} />
         )}
         {active === 'battery' && (
           <Placeholder title="Battery & Power" step="step 7" has={has}

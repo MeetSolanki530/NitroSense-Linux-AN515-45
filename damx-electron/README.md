@@ -128,6 +128,35 @@ look like a cold one, and a suspended dGPU must never look like 0 MHz.
 node scripts/test-home.ts    # gauge geometry + label formatting
 ```
 
+## Step 6 — thermal + fan control (done)
+
+The first view that writes to hardware.
+
+Mode tiles are built from the kernel's `platform_profile_choices`, not a fixed
+Quiet/Balanced/Performance/Turbo set — the daemon only accepts values the
+kernel reports, so hardcoding four tiles would offer modes the machine cannot
+take. On a host reporting three profiles, three tiles appear.
+
+Every write is **optimistic with reconciliation**: apply locally at once, then
+re-read `get_all_settings` and let the daemon's answer win — on failure too,
+so a control snaps back rather than sitting on a value the hardware refused.
+Sliders debounce 150ms, because the transport allows one in-flight request.
+
+Controls whose feature the daemon does not report are **disabled with a
+reason**, never hidden, so a driver problem stays distinguishable from a UI
+bug. Fan `0/0` means automatic; switching to Manual does not write until a
+slider actually moves.
+
+```bash
+npm test          # validation, telemetry, formatting  (68 assertions)
+npm run test:e2e  # real writes through the full chain (13 assertions)
+```
+
+The e2e suite launches the actual Electron app against the mock daemon and
+drives writes from the renderer, asserting against the daemon's state rather
+than the UI's optimism. It also asserts the renderer has no `require`, no
+`process`, and no generic `send()`.
+
 ## Protocol notes
 
 The daemon has **no message framing**: a bare `recv(4096)` per request and a

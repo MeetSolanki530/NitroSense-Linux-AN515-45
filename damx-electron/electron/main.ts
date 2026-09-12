@@ -53,6 +53,23 @@ function createWindow(): BrowserWindow {
   // Smoke mode: render, capture, exit. Used by scripts/smoke.sh to verify the
   // shell actually paints and that telemetry reaches the renderer, without a
   // human watching a window.
+  // Integration hook: run a snippet in the renderer and print its result.
+  // Used by scripts/test-writes.ts to drive real writes through the whole
+  // chain (renderer -> preload -> validation -> socket -> daemon).
+  const evalArg = process.argv.find((a) => a.startsWith('--smoke-eval='));
+  if (evalArg) {
+    const code = Buffer.from(evalArg.slice('--smoke-eval='.length), 'base64').toString('utf8');
+    win.webContents.once('did-finish-load', () => {
+      setTimeout(() => {
+        void win.webContents
+          .executeJavaScript(code, true)
+          .then((r) => console.log('[eval]', JSON.stringify(r)))
+          .catch((e) => console.log('[eval-error]', String(e?.message ?? e)))
+          .finally(() => app.exit(0));
+      }, 1_200);
+    });
+  }
+
   const smokeOut = process.argv.find((a) => a.startsWith('--smoke-out='));
   if (smokeOut) {
     const outPath = smokeOut.slice('--smoke-out='.length);
@@ -77,10 +94,13 @@ function createWindow(): BrowserWindow {
     return { action: 'deny' };
   });
 
+  const tabArg = process.argv.find((a) => a.startsWith('--smoke-tab='));
+  const hash = tabArg ? tabArg.slice('--smoke-tab='.length) : '';
+
   if (DEV_SERVER) {
-    void win.loadURL(DEV_SERVER);
+    void win.loadURL(DEV_SERVER + (hash ? `#${hash}` : ''));
   } else {
-    void win.loadFile(join(APP_DIR, '../dist/index.html'));
+    void win.loadFile(join(APP_DIR, '../dist/index.html'), hash ? { hash } : undefined);
   }
 
   win.on('closed', () => {

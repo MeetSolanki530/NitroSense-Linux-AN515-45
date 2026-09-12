@@ -59,7 +59,18 @@ state = {
     "param": "nitro_v4" if "--start-forced" in flags else "",
     "persistent": False,
     "broken": False,
+    "profile": "balanced",
+    "fan_cpu": 0,
+    "fan_gpu": 0,
+    "toggles": {
+        "backlight_timeout": "0", "battery_calibration": "0",
+        "battery_limiter": "1", "boot_animation_sound": "1",
+        "lcd_override": "0",
+    },
+    "usb_charging": "10",
 }
+
+PROFILES = ["low-power", "balanced", "performance"]
 lock = threading.Lock()
 
 
@@ -78,16 +89,15 @@ def settings():
         "version": "1.0.0-mock",
         "driver_version": "0.0.9",
         "modprobe_parameter": state["param"] if state["persistent"] else "",
-        "thermal_profile": {"current": "balanced",
-                            "available": ["low-power", "balanced", "performance"]},
+        "thermal_profile": {"current": state["profile"], "available": PROFILES},
     }
     if "fan_speed" in f:
-        s["fan_speed"] = {"cpu": "0", "gpu": "0"}
-    for k, v in (("backlight_timeout", "0"), ("battery_calibration", "0"),
-                 ("battery_limiter", "1"), ("boot_animation_sound", "1"),
-                 ("lcd_override", "0"), ("usb_charging", "10")):
+        s["fan_speed"] = {"cpu": str(state["fan_cpu"]), "gpu": str(state["fan_gpu"])}
+    for k, v in state["toggles"].items():
         if k in f:
             s[k] = v
+    if "usb_charging" in f:
+        s["usb_charging"] = state["usb_charging"]
     if "four_zone_mode" in f:
         s["four_zone_mode"] = "0,0,100,1,255,80,0"
     return s
@@ -129,9 +139,44 @@ def handle(conn):
             elif cmd == "get_modprobe_parameter":
                 resp = {"success": True,
                         "data": {"parameter": state["param"] if state["persistent"] else ""}}
+            elif cmd == "set_thermal_profile":
+                prof = params.get("profile", "")
+                ok = prof in PROFILES and "thermal_profile" in features()
+                if ok:
+                    state["profile"] = prof
+                resp = {"success": ok, "data": {"profile": prof} if ok else None,
+                        "error": None if ok else "Failed to set thermal profile"}
+
+            elif cmd == "set_fan_speed":
+                cpu, gpu = params.get("cpu", 0), params.get("gpu", 0)
+                ok = (isinstance(cpu, int) and isinstance(gpu, int)
+                      and 0 <= cpu <= 100 and 0 <= gpu <= 100
+                      and "fan_speed" in features())
+                if ok:
+                    state["fan_cpu"], state["fan_gpu"] = cpu, gpu
+                resp = {"success": ok, "data": {"cpu": cpu, "gpu": gpu} if ok else None,
+                        "error": None if ok else "Failed to set fan speed"}
+
+            elif cmd in ("set_backlight_timeout", "set_battery_calibration",
+                         "set_battery_limiter", "set_boot_animation_sound",
+                         "set_lcd_override"):
+                key = cmd[len("set_"):]
+                enabled = params.get("enabled", False)
+                ok = isinstance(enabled, bool) and key in features()
+                if ok:
+                    state["toggles"][key] = "1" if enabled else "0"
+                resp = {"success": ok, "data": {"enabled": enabled} if ok else None,
+                        "error": None if ok else f"Failed to set {key}"}
+
+            elif cmd == "get_thermal_profile":
+                resp = {"success": True,
+                        "data": {"current": state["profile"], "available": PROFILES}}
+
             elif cmd == "set_usb_charging":
                 lvl = params.get("level", 0)
                 ok = lvl in (0, 10, 20, 30) and "usb_charging" in features()
+                if ok:
+                    state["usb_charging"] = str(lvl)
                 resp = {"success": ok, "data": {"level": lvl} if ok else None,
                         "error": None if ok else "Failed to set USB charging"}
             else:
