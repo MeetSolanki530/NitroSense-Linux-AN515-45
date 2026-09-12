@@ -276,10 +276,15 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
  *
  * The driver only creates its four_zoned_kb sysfs group when
  *     quirks->four_zone_kb || enable_all
- * (linuwu_sense.c:4535). Models whose quirk entry sets four_zone_kb = 0 —
- * AN515-45 among them — therefore expose no RGB interface under nitro_v4 even
- * when the hardware has one. enable_all forces that quirk on, so an absent
- * node is only evidence of absent hardware once enable_all has been tried.
+ * (linuwu_sense.c:4535). This model's quirk entry sets four_zone_kb = 0, so
+ * nitro_v4 never creates the node. enable_all forces it on and the node does
+ * appear — but confirmed with two direct writes (a static colour, a breathing
+ * effect), the ACPI calls report success and the keyboard never visibly
+ * changes. Same signature as lcd_override: reports success, no hardware
+ * effect. enable_all also stacks predator_v4 quirks on top of nitro_v4, which
+ * changes how the RGB-brightness hotkeys (Fn+F9/F10) are decoded — not worth
+ * that cost for a control that does nothing, so this is treated as confirmed
+ * non-functional rather than "try enable_all".
  */
 function NoLightingNote({
   hasFourZoneKb, parameter,
@@ -292,10 +297,10 @@ function NoLightingNote({
       {triedEnableAll ? (
         <>
           <p>
-            The driver was loaded with <code>enable_all</code>, which forces the
-            zoned-keyboard node on regardless of the model quirk, and it still did not
-            appear. That points at the controller genuinely being absent on this
-            machine rather than a driver configuration.
+            The driver is loaded with <code>enable_all</code>, which forces the
+            zoned-keyboard node on regardless of the model quirk, and the node still
+            did not appear. That points at the controller genuinely being absent on
+            this machine.
           </p>
           <p className="dim">
             Backlight brightness, if the keyboard has it, stays on the Fn keys.
@@ -304,20 +309,16 @@ function NoLightingNote({
       ) : (
         <>
           <p>
-            Neither lighting mode is reported by the driver
-            {parameter !== '' && <> with <code>{parameter}</code> applied</>}.
-          </p>
-          <p>
-            The driver only creates the keyboard-RGB node when the model&rsquo;s quirk
-            entry enables it, or when loaded with <code>enable_all</code>. On
-            AN515-series hardware that quirk is often <code>0</code>, so the controls
-            stay hidden even where the keyboard supports them.
+            Confirmed non-functional on this hardware, not just unreported. Loading the
+            driver with <code>enable_all</code> does create the per-zone and four-zone
+            controls, but two direct writes (a static colour, a breathing effect) both
+            reported success while the keyboard never visibly changed. Same class of
+            firmware gap as LCD override and thermal-mode switching.
           </p>
           <p className="dim">
-            Try <code>enable_all</code> from the Internals tab, or reload the driver
-            with <code>sudo ./scripts/try-driver.sh --enable-all</code>. It also forces
-            the predator quirks, so revert to <code>nitro_v4</code> if anything else
-            misbehaves.
+            <code>enable_all</code> also changes how the RGB-brightness hotkeys
+            (Fn+F9/F10) are decoded, so it is not worth loading just to re-confirm this.
+            Stay on plain <code>nitro_v4</code> for the features that do work.
           </p>
         </>
       )}
