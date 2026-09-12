@@ -146,12 +146,15 @@ export class NitroKey {
   }
 
   /**
-   * The key currently bound to us, if any.
+   * The key currently bound to us, if any, repaired if it has gone stale.
    *
-   * A shortcut written by an earlier version carries the old name. Rather than
-   * leaving that lying around under a name this project no longer uses, it is
-   * renamed in place and its command pointed at the current launcher, so there
-   * is exactly one shortcut and it says NitroSense.
+   * A shortcut is a path written down once and never checked again, so it rots
+   * quietly: the app gets installed somewhere else, or the checkout it pointed
+   * at is renamed, and the key silently stops working while the shortcut still
+   * looks perfectly fine in the settings UI.
+   *
+   * So the name and the command are both brought back into line whenever they
+   * drift, keeping the key the user already chose.
    */
   async existingBinding(): Promise<string | null> {
     if (!(await available())) return null;
@@ -165,7 +168,9 @@ export class NitroKey {
         // decision, so ignore them and let setup carry on.
         if (!value || name.includes('detecting')) continue;
 
-        if (!name.includes(ENTRY_NAME)) {
+        const command = (await run('gsettings', ['get', `${CUSTOM}:${path}`, 'command']))
+          .replace(/^'|'$/g, '');
+        if (!name.includes(ENTRY_NAME) || command !== this.#launcher) {
           await this.#write(path, ENTRY_NAME, this.#launcher, value);
         }
         return value;

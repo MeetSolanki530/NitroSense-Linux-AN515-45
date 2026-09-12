@@ -37,6 +37,22 @@ const DEV_SERVER = process.env.VITE_DEV_SERVER_URL;
 let mainWindow: BrowserWindow | null = null;
 let services: Services | null = null;
 
+/**
+ * What the keyboard shortcut should run.
+ *
+ * A packaged install must point at the installed binary. Pointing it at a
+ * checkout means the key dies the moment that folder is moved, renamed or
+ * deleted, with nothing to say why: the shortcut still exists and still looks
+ * correct, it just runs a path that is no longer there.
+ *
+ * Running from source there is no installed binary, so the launcher script it
+ * is, since that also handles building and finding node.
+ */
+function launcherPath(): string {
+  if (app.isPackaged) return process.execPath;
+  return join(APP_DIR, '../scripts/launch.sh');
+}
+
 /** Source icon path, present only when running unpackaged. */
 function windowIcon(): string | null {
   const p = join(APP_DIR, '..', 'build', 'icons', '256x256.png');
@@ -233,7 +249,7 @@ if (!app.requestSingleInstanceLock()) {
     const client = new HardwareClient();
     const internals = new InternalsManager(client);
     const telemetry = new TelemetryPoller({ intervalMs: 1_000 });
-    const nitroKey = new NitroKey(app.getPath('userData'), join(APP_DIR, '../scripts/launch.sh'));
+    const nitroKey = new NitroKey(app.getPath('userData'), launcherPath());
 
     services = { client, internals, telemetry, nitroKey };
     registerIpc(services, () => mainWindow);
