@@ -36,7 +36,8 @@ export type Reading = number | null;
 
 export type Telemetry = {
   timestamp: number;
-  cpu: { usagePct: Reading; tempC: Reading };
+  /** model is read once at discovery — it is static hardware info, not a sample. */
+  cpu: { usagePct: Reading; tempC: Reading; model: string | null };
   /** Discrete NVIDIA GPU. `idle` true means runtime-suspended: show "--". */
   gpu: {
     present: boolean;
@@ -59,6 +60,7 @@ type HwmonDevice = { path: string; name: string };
 
 export type SensorMap = {
   cpuTemp: string | null;
+  cpuModel: string | null;
   systemTemp: string | null;
   igpuTemp: string | null;
   fanInputs: string[];
@@ -121,6 +123,21 @@ function which(bin: string): Promise<boolean> {
 }
 
 /**
+ * CPU model name from /proc/cpuinfo, e.g. "AMD Ryzen 7 5800H with Radeon
+ * Graphics". Static hardware info, so this is read once at discovery rather
+ * than every tick — unlike temperature or usage, it cannot change while the
+ * machine is running.
+ */
+async function readCpuModel(): Promise<string | null> {
+  const info = await readText('/proc/cpuinfo');
+  if (!info) return null;
+  const line = info.split('\n').find((l) => l.startsWith('model name'));
+  if (!line) return null;
+  const value = line.split(':')[1]?.trim();
+  return value || null;
+}
+
+/**
  * Locate every sensor by name. Safe to call repeatedly — and it must be
  * called again after the driver is reloaded, because that is when the fan
  * hwmon appears.
@@ -135,6 +152,7 @@ export async function discoverSensors(): Promise<SensorMap> {
   const cpuTemp = cpuDev
     ? await firstExisting([`${cpuDev.path}/temp1_input`, `${cpuDev.path}/temp2_input`])
     : null;
+  const cpuModel = await readCpuModel();
 
   const sysDev = byName('acpitz');
   const systemTemp = sysDev ? await firstExisting([`${sysDev.path}/temp1_input`]) : null;
@@ -178,6 +196,7 @@ export async function discoverSensors(): Promise<SensorMap> {
 
   return {
     cpuTemp,
+    cpuModel,
     systemTemp,
     igpuTemp,
     fanInputs,
@@ -376,7 +395,7 @@ export class TelemetryPoller extends EventEmitter {
 
     return {
       timestamp: Date.now(),
-      cpu: { usagePct, tempC: cpuTempC },
+      cpu: { usagePct, tempC: cpuTempC, model: s.cpuModel },
       gpu,
       igpu: { tempC: igpuTempC },
       system: { tempC: systemTempC },

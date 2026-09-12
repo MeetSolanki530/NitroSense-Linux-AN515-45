@@ -11,7 +11,7 @@ export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'rei
 
 export type Telemetry = {
   timestamp: number;
-  cpu: { usagePct: number | null; tempC: number | null };
+  cpu: { usagePct: number | null; tempC: number | null; model: string | null };
   gpu: {
     present: boolean; idle: boolean; name: string | null;
     tempC: number | null; usagePct: number | null; clockMhz: number | null;
