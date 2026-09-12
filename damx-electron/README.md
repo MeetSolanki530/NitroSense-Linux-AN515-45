@@ -268,6 +268,25 @@ series are **anchored at the right edge** so readings from different moments
 never share a column — series start at different times, since the GPU line
 only begins when the card wakes.
 
+## Testing against a real daemon without installing anything
+
+The upstream daemon is pure Python stdlib and runs straight from the source
+tree. This installs nothing — no systemd unit, no files under /opt, no driver
+change — and Ctrl-C removes the socket again.
+
+```bash
+sudo ./scripts/run-daemon-dev.sh   # terminal 1, leave running
+npm start                          # terminal 2
+```
+
+Without the `linuwu_sense` kernel driver loaded the daemon starts but reports
+few or no features, because it has nothing to control. That is itself a useful
+test: the app should connect and show each control as unavailable with a
+reason, rather than pretending it works.
+
+Full hardware control additionally requires the Linuwu-Sense kernel driver,
+which is not part of this repository.
+
 ## Protocol notes
 
 The daemon has **no message framing**: a bare `recv(4096)` per request and a
