@@ -22,7 +22,11 @@ cd "$(dirname "$0")/.."
 PROJECT="$PWD"
 DAEMON_SRC="$PROJECT/../DAMM-Daemon/DAMX-Daemon.py"
 SOCK="/var/run/DAMX.sock"
-LOG="/tmp/damx-daemon.log"
+# Logs live inside the project rather than /tmp so they can be read from a
+# sandboxed editor session, which cannot see the host's /tmp or /var/run.
+LOGDIR="$PROJECT/logs"
+LOG="$LOGDIR/daemon.log"
+APPLOG="$LOGDIR/app.log"
 PIDFILE="/tmp/damx-daemon.pid"
 
 red()   { printf '\033[31m%s\033[0m\n' "$*"; }
@@ -70,6 +74,9 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+mkdir -p "$LOGDIR"
+: > "$APPLOG"
+
 # ---------------------------------------------------------------- sudo once
 step "Authorising"
 dim "  Needed for the kernel driver and the daemon only."
@@ -114,6 +121,9 @@ fi
 [ -S "$SOCK" ] && sudo rm -f "$SOCK"
 
 sudo bash -c "cd '$(dirname "$DAEMON_SRC")' && python3 '$DAEMON_SRC' --verbose > '$LOG' 2>&1 & echo \$! > '$PIDFILE'"
+# The daemon runs as root, so its log lands root-owned; make it readable.
+sleep 0.5
+sudo chmod 644 "$LOG" 2>/dev/null || true
 
 for _ in $(seq 1 30); do
   [ -S "$SOCK" ] && break
@@ -128,7 +138,7 @@ if [ ! -S "$SOCK" ]; then
 fi
 
 green "  Running (pid $(cat "$PIDFILE"))"
-dim "  log: $LOG   — follow it with:  tail -f $LOG"
+dim "  log: logs/daemon.log   — follow with:  tail -f logs/daemon.log"
 
 # Report what the daemon actually found, so a broken feature is visible here
 # rather than only inside the UI.
@@ -138,5 +148,6 @@ sudo grep -E "Detected laptop type|Four-zone keyboard|Available features" "$LOG"
 # ---------------------------------------------------------------- app
 step "3/3  App"
 dim "  npm run $APP_CMD — Ctrl-C here stops everything."
+dim "  logs: logs/daemon.log and logs/app.log"
 echo ""
-npm run "$APP_CMD"
+npm run "$APP_CMD" 2>&1 | tee "$APPLOG"

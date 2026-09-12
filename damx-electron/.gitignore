@@ -3,3 +3,6 @@ dist/
 dist-electron/
 *.log
 release/
+# Runtime logs from scripts/start-all.sh (kept in-project so a sandboxed
+# editor session can read them; /tmp is not shared with the host).
+logs/
