@@ -101,8 +101,11 @@ fi
 green "  Module built: $KO"
 
 if module_loaded linuwu_sense; then
-  CUR="$(cat /sys/module/linuwu_sense/parameters/nitro_v4 2>/dev/null || echo '?')"
-  dim "  linuwu_sense already loaded (nitro_v4=$CUR); reloading to be sure."
+  CUR=""
+  for prm in enable_all nitro_v4 predator_v4; do
+    [ "$(cat "/sys/module/linuwu_sense/parameters/$prm" 2>/dev/null)" = "Y" ] && CUR="$CUR $prm"
+  done
+  dim "  linuwu_sense already loaded (${CUR:- no parameters}); reloading as $PARAM_NOTE."
   if ! rmmod linuwu_sense 2>/dev/null; then
     red "  Could not unload the running module — it is in use."
     red "  Stop anything using it (the DAMX daemon) and try again:"
@@ -120,13 +123,41 @@ if module_loaded acer_wmi; then
   sleep 1
 fi
 
-dim "  Inserting with nitro_v4=1 (AN515-series)…"
-if ! insmod "$KO" nitro_v4=1; then
-  red "  insmod failed. Check: dmesg | tail -30"
+dim "  Inserting with $PARAM_NOTE…"
+if ! INS_ERR="$(insmod "$KO" $MOD_PARAM 2>&1)"; then
+  if echo "$INS_ERR" | grep -qi "File exists"; then
+    red "  The module is still loaded and could not be removed first."
+    echo "      sudo rmmod linuwu_sense   # then re-run this script"
+  else
+    red "  insmod failed: $INS_ERR"
+    echo "      dmesg | tail -30"
+  fi
   modprobe acer_wmi 2>/dev/null || true
   exit 1
 fi
-green "  Driver loaded."
+green "  Driver loaded with $MOD_PARAM."
+
+# Read the parameters back rather than trusting that insmod did what was asked.
+# A previous version of this script set the parameter variable but still passed
+# a hardcoded one to insmod, and then reported a conclusion based on the
+# parameter it had NOT used.
+PARAM_DIR="/sys/module/linuwu_sense/parameters"
+if [ -d "$PARAM_DIR" ]; then
+  ACTUAL=""
+  for prm in enable_all nitro_v4 predator_v4; do
+    val="$(cat "$PARAM_DIR/$prm" 2>/dev/null || echo N)"
+    [ "$val" = "Y" ] && ACTUAL="$ACTUAL $prm"
+  done
+  dim "  active parameters:${ACTUAL:- none}"
+
+  WANT="${MOD_PARAM%%=*}"
+  if ! echo "$ACTUAL" | grep -qw "$WANT"; then
+    red "  Requested $WANT but the module reports:${ACTUAL:- none}"
+    red "  Not continuing, since any conclusion drawn now would be wrong."
+    exit 1
+  fi
+fi
+
 
 sleep 2
 head_ "What appeared"
