@@ -5,8 +5,8 @@
  *   four_zone_mode "mode,speed,brightness,direction,red,green,blue"
  */
 import {
-  EFFECTS, hexToRgb, normaliseHex, parseFourZone, parsePerZone,
-  rgbToHex, usesAnimation, usesDirection,
+  EFFECTS, effectFor, hexToRgb, normaliseHex, parseFourZone, parsePerZone,
+  rgbToHex, usesAnimation, usesColour, usesDirection,
 } from '../src/state/keyboard.ts';
 
 let passed = 0;
@@ -55,12 +55,22 @@ console.log('\n4. Effect semantics (from the daemon table)');
 check('eight effects are exposed', EFFECTS.length === 8);
 check('mode 0 is Static', EFFECTS[0]?.name === 'Static');
 check('mode 7 is Twinkling', EFFECTS[7]?.name === 'Twinkling');
-check('Static has no animation', usesAnimation(0) === false);
-check('Breathing animates', usesAnimation(1) === true);
+check('Static ignores speed', usesAnimation(0) === false);
+check('Breathing ignores speed (driver zeroes it)', usesAnimation(1) === false);
+check('Neon uses speed', usesAnimation(2) === true);
+check('Shifting uses speed', usesAnimation(4) === true);
+
 check('Wave uses direction', usesDirection(3) === true);
 check('Shifting uses direction', usesDirection(4) === true);
 check('Static does not use direction', usesDirection(0) === false);
+check('Breathing does not use direction', usesDirection(1) === false);
 check('Zoom does not use direction', usesDirection(5) === false);
+
+check('Neon discards colour', usesColour(2) === false);
+check('Wave discards colour', usesColour(3) === false);
+check('Static uses colour', usesColour(0) === true);
+check('Shifting uses colour', usesColour(4) === true);
+check('unknown mode falls back to Static', effectFor(99).name === 'Static');
 
 console.log(`\n${failed === 0 ? '\x1b[32m' : '\x1b[31m'}${passed} passed, ${failed} failed\x1b[0m\n`);
 process.exit(failed === 0 ? 0 : 1);

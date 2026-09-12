@@ -13,8 +13,8 @@ import { useEffect, useState, type JSX } from 'react';
 import { ControlBlock, Slider, gateFor } from '../components/Control';
 import { useCommand } from '../state/useCommand';
 import {
-  DEFAULT_FOUR_ZONE, DEFAULT_PER_ZONE, DIRECTIONS, EFFECTS,
-  hexToRgb, parseFourZone, parsePerZone, rgbToHex, usesAnimation, usesDirection,
+  DEFAULT_FOUR_ZONE, DEFAULT_PER_ZONE, DIRECTIONS, EFFECTS, effectFor,
+  hexToRgb, parseFourZone, parsePerZone, rgbToHex, usesAnimation, usesColour, usesDirection,
 } from '../state/keyboard';
 import type { FourZone, PerZone } from '../state/keyboard';
 import type { ConnectionState, Settings } from '../state/damx';
@@ -72,10 +72,11 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
       .then((ok) => { if (ok) setDirty((d) => ({ ...d, fourZone: false })); });
   };
 
-  const effect = EFFECTS.find((e) => e.mode === fourZone.mode) ?? EFFECTS[0];
+  const effect = effectFor(fourZone.mode);
   const fourZoneHex = rgbToHex(fourZone.red, fourZone.green, fourZone.blue);
   const animated = usesAnimation(fourZone.mode);
   const directional = usesDirection(fourZone.mode);
+  const coloured = usesColour(fourZone.mode);
 
   return (
     <div className="keyboard-view">
@@ -186,7 +187,7 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
             <input
               type="color"
               value={`#${fourZoneHex}`}
-              disabled={!fourZoneGate.ok || busy}
+              disabled={!fourZoneGate.ok || busy || !coloured}
               onChange={(e) => {
                 const rgb = hexToRgb(e.target.value);
                 if (!rgb) return;
@@ -195,7 +196,9 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
               }}
               aria-label="Effect colour"
             />
-            <code className="zone-hex">#{fourZoneHex}</code>
+            <code className="zone-hex">
+              {coloured ? `#${fourZoneHex}` : 'n/a'}
+            </code>
           </div>
 
           <Slider

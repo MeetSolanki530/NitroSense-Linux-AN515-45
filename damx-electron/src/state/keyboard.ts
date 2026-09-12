@@ -24,29 +24,61 @@ export type FourZone = {
   blue: number;
 };
 
-export const EFFECTS: { mode: number; name: string; note?: string }[] = [
-  { mode: 0, name: 'Static', note: 'A fixed colour. Speed and direction do not apply.' },
-  { mode: 1, name: 'Breathing' },
-  { mode: 2, name: 'Neon' },
-  { mode: 3, name: 'Wave', note: 'Wave and Shifting drive the same native effect on this hardware.' },
-  { mode: 4, name: 'Shifting', note: 'Wave and Shifting drive the same native effect on this hardware.' },
-  { mode: 5, name: 'Zoom' },
-  { mode: 6, name: 'Meteor' },
-  { mode: 7, name: 'Twinkling' },
+/**
+ * Which inputs each effect actually uses.
+ *
+ * Taken from the driver's own switch statement in four_zoned_rgb_kb_store
+ * (linuwu_sense.c:4167-4199), which silently zeroes the fields an effect does
+ * not use before issuing the WMI call. Offering a control the driver is about
+ * to discard would be misleading, so each effect declares what it honours.
+ */
+export type Effect = {
+  mode: number;
+  name: string;
+  usesColour: boolean;
+  usesSpeed: boolean;
+  usesDirection: boolean;
+  note?: string;
+};
+
+export const EFFECTS: Effect[] = [
+  { mode: 0, name: 'Static', usesColour: true, usesSpeed: false, usesDirection: false,
+    note: 'A fixed colour. The driver ignores speed and direction here.' },
+  { mode: 1, name: 'Breathing', usesColour: true, usesSpeed: false, usesDirection: false,
+    note: 'The driver zeroes speed for this effect; its rate is fixed in firmware.' },
+  { mode: 2, name: 'Neon', usesColour: false, usesSpeed: true, usesDirection: false,
+    note: 'Cycles its own colours — the driver discards any colour you set.' },
+  { mode: 3, name: 'Wave', usesColour: false, usesSpeed: true, usesDirection: true,
+    note: 'The driver discards colour for Wave and uses direction instead.' },
+  { mode: 4, name: 'Shifting', usesColour: true, usesSpeed: true, usesDirection: true,
+    note: 'The only effect that uses every input.' },
+  { mode: 5, name: 'Zoom', usesColour: true, usesSpeed: true, usesDirection: false },
+  { mode: 6, name: 'Meteor', usesColour: true, usesSpeed: true, usesDirection: false },
+  { mode: 7, name: 'Twinkling', usesColour: true, usesSpeed: true, usesDirection: false },
 ];
+
+export function effectFor(mode: number): Effect {
+  return EFFECTS.find((e) => e.mode === mode) ?? (EFFECTS[0] as Effect);
+}
 
 export const DIRECTIONS: { value: number; label: string }[] = [
   { value: 1, label: 'Right to left' },
   { value: 2, label: 'Left to right' },
 ];
 
-/** Static goes through a different daemon code path that ignores animation. */
+/** Speed is honoured by every effect except Static and Breathing. */
 export function usesAnimation(mode: number): boolean {
-  return mode !== 0;
+  return effectFor(mode).usesSpeed;
 }
 
+/** Only Wave and Shifting act on direction. */
 export function usesDirection(mode: number): boolean {
-  return mode === 3 || mode === 4;
+  return effectFor(mode).usesDirection;
+}
+
+/** Neon and Wave generate their own colours; the driver discards yours. */
+export function usesColour(mode: number): boolean {
+  return effectFor(mode).usesColour;
 }
 
 const HEX6 = /^[0-9a-fA-F]{6}$/;
