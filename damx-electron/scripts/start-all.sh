@@ -2,10 +2,15 @@
 #
 # One command to bring the whole stack up: kernel driver, daemon, and app.
 #
-#   ./scripts/start-all.sh              driver (nitro_v4) + daemon + app
+#   ./scripts/start-all.sh              patch + driver + daemon + app
 #   ./scripts/start-all.sh --dev        same, but with hot reload
 #   ./scripts/start-all.sh --enable-all load the driver with enable_all
 #   ./scripts/start-all.sh --no-driver  skip the driver step
+#
+# The driver is loaded with NO module parameter on purpose. find_quirks()
+# returns early for a forced nitro_v4, before DMI matching runs, which throws
+# away the AN515-45 entry that declares four_zone_kb -- and with it the
+# keyboard RGB node. Passing nothing lets DMI decide.
 #
 # Run it as YOUR user, not with sudo. It asks for the sudo password once and
 # uses it only for the driver and the daemon; the app itself runs as you,
@@ -108,22 +113,66 @@ trap 'kill $SUDO_KEEPALIVE 2>/dev/null || true; cleanup' EXIT INT TERM
 # ---------------------------------------------------------------- driver
 if [ "$LOAD_DRIVER" -eq 1 ]; then
   step "1/3  Kernel driver"
-  WANT="nitro_v4"
-  [ "${DRIVER_ARGS[0]:-}" = "--enable-all" ] && WANT="enable_all"
 
-  CURRENT=""
+  # The driver clone is gitignored, so a fresh checkout has none of our fixes.
+  # Without them keyboard RGB writes are accepted and silently ignored, which
+  # is indistinguishable from absent hardware -- so check before loading.
+  SRC="$PROJECT/../Linuwu-Sense/src/linuwu_sense.c"
+  if [ ! -f "$SRC" ]; then
+    red "  Driver source missing at $SRC"
+    echo "  Fetch it first, then re-run."
+    exit 1
+  fi
+
+  NEED_PATCH=0
+  grep -q "set_zone_color" "$SRC" || NEED_PATCH=1
+  grep -q "boot_animation_sound get refused" "$SRC" || NEED_PATCH=1
+
+  if [ "$NEED_PATCH" -eq 1 ]; then
+    dim "  Applying driver patches from patches/…"
+    for pf in "$PROJECT/../patches"/*.patch; do
+      [ -f "$pf" ] || continue
+      # -N so an already-applied hunk is skipped rather than reversed.
+      if patch -p1 -N -s -d "$PROJECT/../Linuwu-Sense" < "$pf"; then
+        dim "    applied $(basename "$pf")"
+      else
+        warn "    $(basename "$pf") did not apply cleanly"
+      fi
+    done
+  else
+    dim "  Driver source already patched."
+  fi
+
+  # Judge the loaded driver by what it exposes, not by which flag was passed:
+  # the default load passes no parameter at all, so there is no flag to check.
+  ATTR="/sys/module/linuwu_sense/drivers/platform:acer-wmi/acer-wmi"
+  FORCED=""
   if [ -d /sys/module/linuwu_sense ]; then
     for prm in enable_all nitro_v4 predator_v4; do
       [ "$(cat "/sys/module/linuwu_sense/parameters/$prm" 2>/dev/null)" = "Y" ] \
-        && CURRENT="$CURRENT $prm"
+        && FORCED="$FORCED $prm"
     done
   fi
 
-  if echo "$CURRENT" | grep -qw "$WANT"; then
-    green "  Already loaded with $WANT — nothing to do."
+  WANT_ENABLE_ALL=0
+  [ "${DRIVER_ARGS[0]:-}" = "--enable-all" ] && WANT_ENABLE_ALL=1
+
+  RELOAD=1
+  if [ -d "$ATTR/four_zoned_kb" ]; then
+    if [ "$WANT_ENABLE_ALL" -eq 1 ]; then
+      echo "$FORCED" | grep -qw enable_all && RELOAD=0
+    elif [ -z "$FORCED" ]; then
+      # Loaded with no forced parameter and the RGB node is present: this is
+      # exactly the state we want.
+      RELOAD=0
+    fi
+  fi
+
+  if [ "$RELOAD" -eq 0 ]; then
+    green "  Already loaded correctly (keyboard RGB present) — nothing to do."
   else
-    dim "  Loading with $WANT…"
-    sudo "$PROJECT/scripts/try-driver.sh" "${DRIVER_ARGS[@]}" | sed 's/^/  /'
+    dim "  Loading${DRIVER_ARGS[0]:+ with ${DRIVER_ARGS[0]}}…"
+    sudo "$PROJECT/scripts/try-driver.sh" "${DRIVER_ARGS[@]+"${DRIVER_ARGS[@]}"}" | sed 's/^/  /'
   fi
 else
   step "1/3  Kernel driver (skipped)"

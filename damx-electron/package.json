@@ -1,8 +1,13 @@
 {
   "name": "damx-electron",
   "version": "0.1.0",
-  "private": true,
   "description": "React/Electron frontend for the DAMX daemon (Div Acer Manager Max)",
+  "homepage": "https://github.com/PXDiv/Div-Acer-Manager-Max",
+  "author": {
+    "name": "tr-dotcom",
+    "email": "tr@eaxmedia.com"
+  },
+  "private": true,
   "type": "module",
   "scripts": {
     "probe": "node scripts/probe.ts",
@@ -58,15 +63,19 @@
         "deb"
       ],
       "category": "Settings;HardwareSettings",
+      "maintainer": "tr-dotcom <tr@eaxmedia.com>",
       "icon": "build/icons",
       "executableName": "DivAcerManagerMax",
       "desktop": {
-        "Name": "Div Acer Manager Max",
-        "Comment": "Fan, power, battery and keyboard control for Acer Nitro laptops",
-        "Categories": "Settings;HardwareSettings;",
-        "Keywords": "acer;nitro;fan;rgb;battery;nitrosense;",
-        "StartupWMClass": "DivAcerManagerMax"
-      }
+        "entry": {
+          "Name": "Div Acer Manager Max",
+          "Comment": "Fan, power, battery and keyboard control for Acer Nitro laptops",
+          "Categories": "Settings;HardwareSettings;",
+          "Keywords": "acer;nitro;fan;rgb;battery;nitrosense;",
+          "StartupWMClass": "DivAcerManagerMax"
+        }
+      },
+      "synopsis": "Acer Nitro hardware control"
     }
   }
 }
