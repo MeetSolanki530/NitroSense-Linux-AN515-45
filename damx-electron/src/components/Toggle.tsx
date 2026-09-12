@@ -4,6 +4,14 @@
  * Tri-state: a null value means the daemon could not report the current
  * state, which renders as "unknown" rather than off. Showing off for an
  * unreadable feature would misrepresent the hardware.
+ *
+ * "Unknown" never disables the switch. On this hardware, three attributes
+ * (backlight_timeout, boot_animation_sound, lcd_override) always read back
+ * as unknown because the driver's GET decoder doesn't recognise this
+ * model's raw WMI response — but SET is independent of that decoder and
+ * has been confirmed to succeed at the ACPI level (see format.ts's
+ * isUnsupported doc). Disabling the control here would block a working
+ * feature because its readout happens to be unreliable.
  */
 import type { JSX, ReactNode } from 'react';
 import type { Tri } from '../state/format';
@@ -14,30 +22,27 @@ type Props = {
   value: Tri;
   disabled?: boolean;
   busy?: boolean;
-  /** Driver reports -1: the file exists but this model does not implement it. */
-  unsupported?: boolean;
   onChange: (next: boolean) => void;
 };
 
 export function Toggle({
-  label, description, value, disabled, busy, unsupported, onChange,
+  label, description, value, disabled, busy, onChange,
 }: Props): JSX.Element {
-  const unknown = value === null && !unsupported;
+  const unknown = value === null;
   return (
-    <div className={`toggle-row${disabled || unsupported ? ' is-disabled' : ''}`}>
+    <div className={`toggle-row${disabled ? ' is-disabled' : ''}`}>
       <div className="toggle-text">
         <span className="toggle-label">{label}</span>
         {description && <span className="toggle-desc dim">{description}</span>}
       </div>
       <div className="toggle-side">
-        {unsupported && <span className="toggle-unsupported">not supported</span>}
         {unknown && <span className="toggle-unknown">unknown</span>}
         <button
           type="button"
           role="switch"
           aria-checked={value === true}
           aria-label={label}
-          disabled={disabled || busy || unsupported}
+          disabled={disabled || busy}
           className={`switch${value === true ? ' is-on' : ''}${unknown ? ' is-unknown' : ''}`}
           onClick={() => onChange(!(value === true))}
         >

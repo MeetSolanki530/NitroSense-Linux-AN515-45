@@ -22,11 +22,25 @@ export function toBool(raw: unknown): Tri {
 }
 
 /**
- * The driver writes -1 into an attribute its model does not implement. On
- * AN515-45 that is backlight_timeout, boot_animation_sound and lcd_override:
- * the files exist, so the daemon lists the features as available, but the
- * value is -1 rather than 0 or 1. That is "not supported on this model",
- * which is a different and more useful statement than "unknown".
+ * The driver writes -1 for backlight_timeout, boot_animation_sound and
+ * lcd_override on this model — but that does NOT mean the feature is
+ * unimplemented. Traced against the driver source (linuwu_sense.c): the WMI
+ * GET call for all three succeeds every time; the show() function just
+ * compares the raw result against hardcoded magic constants lifted from a
+ * different Acer model, and anything that doesn't match falls into a "-1"
+ * catch-all — even a clean value like `1` (confirmed via dmesg:
+ * `boot_animation_sound get status: 1` still yields sysfs content "-1",
+ * because 1 is neither of the two constants the driver recognises).
+ *
+ * Critically, SET does not depend on decoding GET at all — it writes fixed
+ * constants of its own. Confirmed directly: writing 1 to backlight_timeout
+ * logged `backlight_timeout set status: 0` with no ACPI failure, twice, on
+ * real hardware. So "-1" means "this model's GET response isn't in the
+ * driver's lookup table", not "not supported" — the toggle must stay
+ * usable, only the displayed current-state must fall back to unknown
+ * (toBool('-1') already returns null for exactly this reason).
+ *
+ * Kept for the explanatory hint in the UI, not to disable anything.
  */
 export function isUnsupported(raw: unknown): boolean {
   return typeof raw === 'string' && raw.trim() === '-1';

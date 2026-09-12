@@ -37,10 +37,15 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
   const backlight = settingBool(settings, 'backlight_timeout');
   const usb = usbLevel(settings);
 
-  // The driver reports -1 for attributes this model does not implement.
-  const lcdUnsupported = settingUnsupported(settings, 'lcd_override');
-  const bootUnsupported = settingUnsupported(settings, 'boot_animation_sound');
-  const backlightUnsupported = settingUnsupported(settings, 'backlight_timeout');
+  // The driver's GET decoder doesn't recognise this model's raw WMI
+  // response for these three, so the current state always reads back
+  // unknown — but SET is independent of that decoder and does work
+  // (confirmed: backlight_timeout set status: 0, no ACPI failure, on real
+  // hardware). Used only to explain the "unknown" readout below, never to
+  // disable the toggle — see format.ts's isUnsupported doc for the trace.
+  const lcdUnreadable = settingUnsupported(settings, 'lcd_override');
+  const bootUnreadable = settingUnsupported(settings, 'boot_animation_sound');
+  const backlightUnreadable = settingUnsupported(settings, 'backlight_timeout');
 
   const pct = telemetry?.battery.percent ?? null;
 
@@ -159,7 +164,6 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
           description="Allows the panel to run outside its default timing profile."
           value={lcd}
           busy={busy}
-          unsupported={lcdUnsupported}
           disabled={!connected || !has('lcd_override')}
           onChange={(next) => void run(() => window.damx.setLcdOverride(next))}
         />
@@ -168,7 +172,6 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
           description="The Acer splash animation and chime at power-on."
           value={boot}
           busy={busy}
-          unsupported={bootUnsupported}
           disabled={!connected || !has('boot_animation_sound')}
           onChange={(next) => void run(() => window.damx.setBootAnimationSound(next))}
         />
@@ -177,15 +180,16 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
           description="Dim the keyboard backlight after 30 seconds idle."
           value={backlight}
           busy={busy}
-          unsupported={backlightUnsupported}
           disabled={!connected || !has('backlight_timeout')}
           onChange={(next) => void run(() => window.damx.setBacklightTimeout(next))}
         />
         <MissingNote has={has} features={['lcd_override', 'boot_animation_sound', 'backlight_timeout']} />
-        {(lcdUnsupported || bootUnsupported || backlightUnsupported) && (
+        {(lcdUnreadable || bootUnreadable || backlightUnreadable) && (
           <p className="control-hint dim">
-            Controls marked “not supported” exist in the driver but return -1 on this
-            model, meaning the firmware does not implement them.
+            Controls marked “unknown” can&rsquo;t have their current state confirmed on
+            this model — the driver&rsquo;s decoder doesn&rsquo;t recognise the value it
+            gets back. Setting them still works; the switch just can&rsquo;t show whether
+            it&rsquo;s currently on or off.
           </p>
         )}
       </ControlBlock>
