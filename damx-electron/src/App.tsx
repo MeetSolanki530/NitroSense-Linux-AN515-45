@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { TitleBar } from './components/TitleBar';
 import type { Tab } from './components/TitleBar';
 import { Placeholder } from './views/Placeholder';
+import { Home } from './views/Home';
 import { useConnection, useSettings, useTelemetry } from './state/damx';
 import './components/TitleBar.css';
 import './App.css';
@@ -51,10 +52,7 @@ export function App(): JSX.Element {
       {banner && <div className={`banner banner-${banner.kind}`}>{banner.text}</div>}
 
       <main className="app-body">
-        {active === 'home' && (
-          <Placeholder title="Home" step="step 5" has={has}
-            requires={['thermal_profile', 'fan_speed']} />
-        )}
+        {active === 'home' && <Home telemetry={telemetry} settings={settings} has={has} />}
         {active === 'performance' && (
           <Placeholder title="Performance" step="step 6" has={has}
             requires={['thermal_profile', 'fan_speed']} />
@@ -76,53 +74,7 @@ export function App(): JSX.Element {
             requires={[]} />
         )}
 
-        {/* Shell smoke test: proves the whole chain — sysfs -> main ->
-            preload -> renderer — is live. Replaced by the real gauges. */}
-        <section className="panel shell-probe">
-          <h2 className="panel-title">Live telemetry</h2>
-          {telemetry ? (
-            <div className="probe-grid">
-              <Stat label="CPU" value={telemetry.cpu.usagePct} unit="%" />
-              <Stat label="CPU temp" value={telemetry.cpu.tempC} unit="°C" />
-              <Stat
-                label="GPU"
-                value={telemetry.gpu.idle ? null : telemetry.gpu.usagePct}
-                unit="%"
-                note={telemetry.gpu.idle ? 'Discrete GPU is idle' : undefined}
-              />
-              <Stat label="GPU clock" value={telemetry.gpu.idle ? null : telemetry.gpu.clockMhz} unit=" MHz" />
-              <Stat label="System" value={telemetry.system.tempC} unit="°C" />
-              <Stat label="RAM" value={telemetry.ram.usedPct} unit="%" />
-              <Stat label="Fan CPU" value={telemetry.fans.cpuRpm} unit=" RPM" />
-              <Stat label="Battery" value={telemetry.battery.percent} unit="%" />
-            </div>
-          ) : (
-            <p className="dim">Waiting for the first sample…</p>
-          )}
-          <div className="hatch" style={{ marginTop: 16 }} />
-          <p className="dim probe-foot">
-            {settings
-              ? `${settings.laptop_type ?? 'UNKNOWN'} · driver ${settings.driver_version || '—'} · ` +
-                `parameter ${settings.modprobe_parameter || 'none'} · ` +
-                `${settings.available_features?.length ?? 0} features`
-              : 'Daemon settings unavailable — telemetry above is independent of the daemon.'}
-          </p>
-        </section>
       </main>
-    </div>
-  );
-}
-
-function Stat({ label, value, unit, note }: {
-  label: string; value: number | null; unit: string; note?: string;
-}): JSX.Element {
-  return (
-    <div className="stat">
-      <span className="stat-label">{label}</span>
-      <span className="stat-value mono-num">
-        {value === null ? <span className="dim">--</span> : `${value}${unit}`}
-      </span>
-      {note && <span className="stat-note dim">{note}</span>}
     </div>
   );
 }

@@ -103,6 +103,31 @@ a zero.
 On this machine: `k10temp` → CPU, `acpitz` → System, `amdgpu` → iGPU,
 `nvidia-smi` → RTX 3050 Ti. Fan RPM is unavailable until `linuwu_sense` loads.
 
+## Step 5 — Home view (done)
+
+Reproduces the NitroSense composition: GPU frequency dial and usage
+sparklines on the left, wordmark/mode/mark in the centre, three temperature
+arc gauges on the right, and a system + monitoring aside.
+
+All gauges are hand-authored SVG (`src/components/`) — arc paths, tick rings
+and gradients — with no charting library. The accent is mode-reactive, so the
+whole screen shifts red at Performance and amber at Balanced.
+
+Deliberate deviations from the original, and why:
+
+- The centre **"N"** is layered SVG with a shear and a bevel highlight, not
+  the original's rendered 3D asset. It recolours with the mode for free.
+- **No promo card** in the lower left; that slot advertises Windows-only
+  software.
+
+A `null` reading renders `--` everywhere — an unavailable sensor must never
+look like a cold one, and a suspended dGPU must never look like 0 MHz.
+
+```bash
+./scripts/smoke.sh out.png   # render the UI headlessly and capture it
+node scripts/test-home.ts    # gauge geometry + label formatting
+```
+
 ## Protocol notes
 
 The daemon has **no message framing**: a bare `recv(4096)` per request and a
