@@ -190,13 +190,29 @@ fi
 # The script's own command line does not contain the daemon filename, so this
 # pgrep cannot match the script itself.
 EXISTING="$(pgrep -f 'DAMX-Daemon\.py' || true)"
+
+# A match without a socket is not a daemon we can use: either it is still
+# starting, or it died without cleaning up. Rather than dead-end here, wait
+# briefly and then clear it out, because the common case is a daemon whose
+# terminal was closed.
+if [ -n "$EXISTING" ] && [ ! -S "$SOCK" ]; then
+  for _ in $(seq 1 8); do
+    [ -S "$SOCK" ] && break
+    sleep 0.25
+  done
+  if [ ! -S "$SOCK" ]; then
+    warn "  Found a DAMX-Daemon process but no socket — it is not serving."
+    dim "  Clearing it so a working one can start."
+    sudo pkill -f 'DAMX-Daemon\.py' 2>/dev/null || true
+    sleep 1
+    EXISTING=""
+  fi
+fi
+
 if [ -n "$EXISTING" ]; then
   warn "  A daemon is already running (pid $(echo "$EXISTING" | head -1)) — reusing it."
   dim "  Its log is wherever that terminal was pointed, not logs/daemon.log."
-  if [ ! -S "$SOCK" ]; then
-    red "  But $SOCK does not exist, so it is not serving. Stop it and re-run."
-    exit 1
-  fi
+  dim "  To use this script's own daemon instead:  sudo pkill -f DAMX-Daemon.py"
 else
   # Only remove a socket when no daemon is alive to own it: a leftover file
   # from an unclean exit would otherwise block the bind.
