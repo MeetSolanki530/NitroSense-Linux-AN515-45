@@ -199,6 +199,54 @@ the keyboard controller, and streaming them while a colour picker is dragged
 would hammer the device through a single-in-flight transport. Edits in
 progress are never overwritten by a background poll.
 
+## Step 9 — packaging + Nitro key (done)
+
+```bash
+npm run package:dir              # build release/linux-unpacked
+sudo ./scripts/install-frontend.sh
+```
+
+### Why the install path is load-bearing
+
+`nitro-key-detection.service` guards every key press with
+
+```bash
+pgrep -f "/opt/damx/gui/DivAcerManagerMax" || <launch>
+```
+
+and `/usr/local/bin/DAMX` (a bash wrapper, no `exec`) invokes that absolute
+path. Naming the Electron binary `DivAcerManagerMax` and installing it there
+keeps the existing key handling working with **no change to the daemon, the
+driver, the key script, or its service**.
+
+Two rules follow, both verified in `scripts/test-nitro-guard.sh`:
+
+- **The binary must be a real file at that path, never a symlink.** Electron
+  re-execs itself via `/proc/self/exe`, so a symlinked install makes every
+  process report the *resolved* path and the guard silently never matches —
+  every key press would then spawn another instance. This was observed
+  directly, not assumed.
+- **Not AppImage.** An AppImage self-mounts under `/tmp/.mount_XXXXXX` and its
+  processes report paths into that mount, which breaks the guard the same way.
+
+Electron's `chrome-sandbox` is set `root:root` mode `4755` by the installer,
+which it needs to start from `/opt`.
+
+### Window behaviour
+
+Closing the window quits the app — there is no tray. The key guard only
+launches when no process matches, so a tray-resident app would make the Nitro
+key appear broken.
+
+### Rollback
+
+The installer copies the existing GUI to `/opt/damx/gui.backup-<timestamp>`
+before writing. Restore with:
+
+```bash
+sudo ./scripts/install-frontend.sh --uninstall
+```
+
 ## Protocol notes
 
 The daemon has **no message framing**: a bare `recv(4096)` per request and a

@@ -13,7 +13,9 @@
     "dev": "npm run build:electron && VITE_DEV_SERVER_URL=http://localhost:5199 concurrently -k \"vite\" \"electron .\"",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test-validate.ts && node scripts/test-telemetry.ts && node scripts/test-home.ts && node scripts/test-format.ts && node scripts/test-keyboard.ts",
-    "test:e2e": "node scripts/test-writes.ts"
+    "test:e2e": "node scripts/test-writes.ts",
+    "package": "npm run build && electron-builder --linux dir deb",
+    "package:dir": "npm run build && electron-builder --linux dir"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
@@ -21,6 +23,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.0"

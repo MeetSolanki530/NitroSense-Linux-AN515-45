@@ -1,0 +1,56 @@
+# Packaging for the DAMX frontend replacement.
+#
+# executableName is load-bearing, not cosmetic. nitro-key-detection.service
+# guards with:
+#     pgrep -f "/opt/damx/gui/DivAcerManagerMax"
+# before launching, so some running process's cmdline must contain that exact
+# string. Naming the Electron binary DivAcerManagerMax and installing it at
+# that path is what keeps the existing guard working with the daemon and the
+# key service untouched.
+#
+# Deliberately NOT AppImage: an AppImage self-mounts under /tmp/.mount_XXXXXX
+# and the running process's cmdline points into the mount, not into
+# /opt/damx/gui, so the guard would silently never match and every key press
+# would spawn another instance.
+appId: com.divacer.managermax
+productName: Div Acer Manager Max
+executableName: DivAcerManagerMax
+copyright: DAMX
+
+directories:
+  output: release
+  buildResources: packaging
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+
+linux:
+  target:
+    - dir
+    - deb
+  category: System
+  synopsis: Acer laptop control for Linux
+  description: >
+    Frontend for the DAMX daemon: thermal profiles, fan control, battery
+    limiter and calibration, USB charging, LCD override, boot animation and
+    keyboard RGB.
+  desktop:
+    entry:
+      Name: Div Acer Manager Max
+      Comment: Acer laptop control
+      Categories: Utility;System;
+      Keywords: acer;nitro;predator;laptop;fan;rgb;
+
+deb:
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libdrm2
+    - libgbm1
