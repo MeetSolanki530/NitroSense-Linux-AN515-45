@@ -16,3 +16,6 @@ DAMM-Daemon/build/
 DAMM-Daemon/dist/
 
 DAMM-Daemon/__pycache__/
+
+# Third-party kernel driver source, fetched by setup (has its own upstream)
+Linuwu-Sense/

@@ -284,8 +284,28 @@ few or no features, because it has nothing to control. That is itself a useful
 test: the app should connect and show each control as unavailable with a
 reason, rather than pretending it works.
 
-Full hardware control additionally requires the Linuwu-Sense kernel driver,
-which is not part of this repository.
+## Installing the backend
+
+Full hardware control needs the Linuwu-Sense kernel driver and the DAMX
+daemon. Neither ships in this repository as a build.
+
+```bash
+sudo ./scripts/setup-backend.sh          # driver + nitro_v4 + daemon service
+sudo ./scripts/setup-backend.sh --uninstall
+```
+
+It uses **PXDiv/Div-Linuwu-Sense**, which the project README credits. The
+original `0x7375646F/Linuwu-Sense` lacks the `enable_all` module parameter the
+Internals Manager uses; the Div fork has `enable_all`, `nitro_v4` and
+`predator_v4`. `scripts/remote-setup.sh` upstream clones the original, so it
+would leave `enable_all` broken.
+
+The script blacklists `acer_wmi` (the driver's own Makefile does this), sets
+`nitro_v4` in `/etc/modprobe.d/linuwu-sense.conf` because AN515-series
+hardware needs it, and installs the unmodified daemon source as
+`damx-daemon.service`. It stops if kernel headers are missing and warns before
+continuing when Secure Boot is enabled, since an unsigned module will be
+refused.
 
 ## Protocol notes
 
