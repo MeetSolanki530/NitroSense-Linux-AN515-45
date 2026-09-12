@@ -104,13 +104,14 @@ export function Performance({
       >
         {unreadable && (
           <p className="profile-warning">
-            The driver lists the available profiles but cannot read the current one:
-            <code>platform_profile</code> returns an I/O error, on both the legacy
-            <code>/sys/firmware/acpi</code> path and the newer
-            <code>/sys/class/platform-profile</code> class. Confirmed on AC as well as
-            on battery, so it is a driver/firmware limitation on this model rather than
-            a power-source restriction. Selecting a mode below will most likely fail —
-            the exact error is shown if it does.
+            <strong>Thermal profiles are not usable on this machine.</strong>{' '}
+            <code>platform_profile</code> returns an I/O error for both reads and
+            writes, on the legacy <code>/sys/firmware/acpi</code> path and the newer
+            <code>/sys/class/platform-profile</code> class alike. Confirmed with both{' '}
+            <code>nitro_v4</code> and <code>enable_all</code>, on AC and on battery, so
+            it is a driver/firmware limitation rather than a configuration or
+            power-source issue. The tiles are disabled because selecting one only ever
+            returns “Failed to set thermal profile”.
           </p>
         )}
         {choices.length === 0 ? (
@@ -123,7 +124,9 @@ export function Performance({
                 name={name}
                 label={prettyMode(name)}
                 selected={profile.value === name}
-                disabled={!profileGate.ok || busy}
+                // Writes fail with the same EIO as reads, so a clickable tile
+                // would only ever produce an error.
+                disabled={!profileGate.ok || busy || unreadable}
                 onSelect={() => selectProfile(name)}
               />
             ))}
