@@ -75,7 +75,7 @@ They touch different functions and apply cleanly in either order.
 Then load it non-persistently:
 
 ```bash
-sudo ./damx-electron/scripts/try-driver.sh
+sudo ./app/scripts/try-driver.sh
 ```
 
 ### Upstreaming

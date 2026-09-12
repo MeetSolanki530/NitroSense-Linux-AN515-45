@@ -1,0 +1,90 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>NitroSense</title>
+<!--
+  Shown from the moment the process starts until the main window has painted.
+
+  Deliberately self-contained: no bundler output, no webfonts, no scripts. The
+  whole point is to appear before the renderer is ready, so it must not depend
+  on anything the renderer needs. Kept under a few KB so it paints on the first
+  frame.
+-->
+<style>
+  :root { color-scheme: dark; }
+  html, body {
+    margin: 0; height: 100%;
+    background: transparent;
+    overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+  }
+  .card {
+    position: absolute; inset: 0;
+    display: grid; place-content: center; justify-items: center;
+    gap: 18px;
+    border-radius: 18px;
+    background:
+      radial-gradient(120% 120% at 50% 0%, #1c100a 0%, #0b0806 55%, #070504 100%);
+    border: 1px solid rgba(255, 106, 0, 0.28);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+    animation: card-in 260ms ease-out both;
+  }
+  @keyframes card-in {
+    from { opacity: 0; transform: scale(0.96); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .mark { filter: drop-shadow(0 0 18px rgba(255, 106, 0, 0.55)); }
+  .mark path { animation: pulse 1.5s ease-in-out infinite; transform-origin: 50% 50%; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+  }
+
+  .name {
+    font: 600 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: #ff8c2b;
+  }
+  .sub {
+    margin-top: -8px;
+    font: 400 11px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.42);
+  }
+
+  /* Indeterminate sweep: we cannot know real progress, so do not imply it. */
+  .bar {
+    width: 178px; height: 2px; border-radius: 2px;
+    background: rgba(255, 106, 0, 0.15);
+    overflow: hidden;
+  }
+  .bar i {
+    display: block; width: 42%; height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, #ff6a00, #ff8c2b);
+    animation: sweep 1.15s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  @keyframes sweep {
+    0%   { transform: translateX(-110%); }
+    100% { transform: translateX(340%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card, .mark path, .bar i { animation: none; }
+  }
+</style>
+
+<div class="card">
+  <svg class="mark" viewBox="0 0 32 32" width="82" height="82" aria-hidden="true">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ff8c2b"/>
+        <stop offset="100%" stop-color="#ff6a00"/>
+      </linearGradient>
+    </defs>
+    <path d="M6 28 L6 4 L13 4 L13 17 L20 4 L26 4 L26 28 L19 28 L19 14 L12 28 Z" fill="url(#g)"/>
+  </svg>
+
+  <div class="name">NitroSense</div>
+  <div class="sub">Connecting to hardware</div>
+  <div class="bar"><i></i></div>
+</div>

@@ -1,24 +1,17 @@
+service/__pycache__/
+__pycache__/
 
-DivAcerManagerMax/obj/
-
-DivAcerManagerMax/bin/Release/net9.0/linux-x64/
-
-DivAcerManagerMax/bin/Debug/net9.0/
-
-Publish/
-
-publish/
-
-buildPublish/
-
-DAMM-Daemon/build/
-
-DAMM-Daemon/dist/
-
-DAMM-Daemon/__pycache__/
+# Build output
+app/node_modules/
+app/dist/
+app/dist-electron/
+app/release/
+app/logs/
 
 # Third-party kernel driver source, fetched by setup (has its own upstream)
 Linuwu-Sense/
 
-# Third-party driver source for comparison testing (has its own upstream)
-acer-turbo/
+# Reference checkouts of other people's drivers, kept for comparison only.
+# docs/reference/README.md explains what each one settled; the code itself has
+# its own upstream and is re-fetchable, so it is not tracked here.
+docs/reference/*/
