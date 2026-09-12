@@ -57,13 +57,13 @@
         "dir",
         "deb"
       ],
-      "category": "System;Settings;HardwareSettings",
+      "category": "Settings;HardwareSettings",
       "icon": "build/icons",
       "executableName": "DivAcerManagerMax",
       "desktop": {
         "Name": "Div Acer Manager Max",
         "Comment": "Fan, power, battery and keyboard control for Acer Nitro laptops",
-        "Categories": "System;Settings;HardwareSettings;",
+        "Categories": "Settings;HardwareSettings;",
         "Keywords": "acer;nitro;fan;rgb;battery;nitrosense;",
         "StartupWMClass": "DivAcerManagerMax"
       }
