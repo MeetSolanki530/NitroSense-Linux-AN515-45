@@ -19,8 +19,9 @@ import { join } from 'node:path';
 import { DamxClient } from './damx-client.ts';
 import { InternalsManager } from './internals.ts';
 import { TelemetryPoller } from './telemetry.ts';
-import { registerIpc } from './ipc.ts';
+import { CH, registerIpc } from './ipc.ts';
 import type { Services } from './ipc.ts';
+import { NitroKey, acceleratorFromArgv } from './nitro-key.ts';
 
 // Bundled to CommonJS, so __dirname is the real directory of main.cjs.
 // import.meta.url does not exist in that output format.
@@ -208,7 +209,14 @@ function focusExisting(): void {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', focusExisting);
+  app.on('second-instance', (_event, argv) => {
+    // A relaunch during setup is how we learn which key the user pressed:
+    // the shortcut runs the launcher with a marker, the lock sends us its
+    // argv, and the renderer gets told which candidate fired.
+    const accel = acceleratorFromArgv(argv);
+    if (accel) mainWindow?.webContents.send(CH.nitroKey, { accelerator: accel });
+    focusExisting();
+  });
 
   void app.whenReady().then(async () => {
     // First, before any I/O: the Nitro key gives no feedback of its own, so
@@ -219,8 +227,9 @@ if (!app.requestSingleInstanceLock()) {
     const client = new DamxClient();
     const internals = new InternalsManager(client);
     const telemetry = new TelemetryPoller({ intervalMs: 1_000 });
+    const nitroKey = new NitroKey(app.getPath('userData'), join(APP_DIR, '../scripts/launch.sh'));
 
-    services = { client, internals, telemetry };
+    services = { client, internals, telemetry, nitroKey };
     registerIpc(services, () => mainWindow);
 
     // Telemetry is independent of the daemon: sysfs works even when the

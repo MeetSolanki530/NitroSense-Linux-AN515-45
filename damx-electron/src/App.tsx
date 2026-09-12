@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TitleBar } from './components/TitleBar';
+import { NitroKeySetup } from './components/NitroKeySetup';
 import type { Tab } from './components/TitleBar';
 import { Home } from './views/Home';
 import { Performance } from './views/Performance';
@@ -59,6 +60,9 @@ export function App(): JSX.Element {
   return (
     <div className="app-shell">
       <TitleBar tabs={TABS} active={active} onSelect={setActive} connection={connection} />
+
+      {/* Asked once on first run, then never again. */}
+      <NitroKeySetup />
 
       {banner && <div className={`banner banner-${banner.kind}`}>{banner.text}</div>}
 

@@ -15,6 +15,7 @@ const CH = {
   telemetry: 'damx:telemetry',
   state: 'damx:state',
   connection: 'damx:connection',
+  nitroKey: 'damx:nitro-key',
 };
 
 type InvokeResult = { ok: boolean; data?: unknown; error?: string };
@@ -72,8 +73,16 @@ const api = {
   restartDaemon: () => call<unknown>('restartDaemon'),
   restartDriversAndDaemon: () => call<unknown>('restartDriversAndDaemon'),
 
+  // nitrosense key setup
+  nitroKeyState: () => call<unknown>('nitroKeyState'),
+  nitroKeyBegin: () => call<unknown>('nitroKeyBegin'),
+  nitroKeyConfirm: (accelerator: string) => call<unknown>('nitroKeyConfirm', { accelerator }),
+  nitroKeyDecline: () => call<unknown>('nitroKeyDecline'),
+  nitroKeyCancel: () => call<unknown>('nitroKeyCancel'),
+
   // push streams
   onTelemetry: (cb: (t: unknown) => void) => subscribe(CH.telemetry, cb),
+  onNitroKey: (cb: (e: unknown) => void) => subscribe(CH.nitroKey, cb),
   onState: (cb: (s: unknown) => void) => subscribe(CH.state, cb),
   onConnection: (cb: (s: unknown) => void) => subscribe(CH.connection, cb),
 

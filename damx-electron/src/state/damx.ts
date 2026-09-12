@@ -83,6 +83,15 @@ export type PowerModeResult = {
   fan: { ok: boolean; error?: string };
 };
 
+/** Whether the NitroSense key has been set up, and whether it even can be. */
+export type NitroKeyState = {
+  decided: boolean;
+  accelerator: string | null;
+  /** False outside GNOME-family sessions, where there is no shortcut store. */
+  available: boolean;
+  candidates: string[];
+};
+
 declare global {
   interface Window {
     damx: {
@@ -107,7 +116,13 @@ declare global {
       removeParameter(): Promise<OperationResult>;
       restartDaemon(): Promise<OperationResult>;
       restartDriversAndDaemon(): Promise<OperationResult>;
+      nitroKeyState(): Promise<NitroKeyState>;
+      nitroKeyBegin(): Promise<{ ok: boolean }>;
+      nitroKeyConfirm(accelerator: string): Promise<{ ok: boolean }>;
+      nitroKeyDecline(): Promise<{ ok: boolean }>;
+      nitroKeyCancel(): Promise<{ ok: boolean }>;
       onTelemetry(cb: (t: Telemetry) => void): () => void;
+      onNitroKey(cb: (e: { accelerator: string }) => void): () => void;
       onConnection(cb: (s: ConnectionState) => void): () => void;
       window: { minimize(): void; maximize(): void; close(): void };
     };

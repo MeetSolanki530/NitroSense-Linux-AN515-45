@@ -24,18 +24,23 @@ import {
 } from './validate.ts';
 import type { Telemetry } from './telemetry.ts';
 import { applyPowerMode, readPowerState, targetFor } from './cpupower.ts';
+import { available as nitroKeyAvailable, CANDIDATES } from './nitro-key.ts';
+import type { NitroKey } from './nitro-key.ts';
 
 export const CH = {
   invoke: 'damx:invoke',
   telemetry: 'damx:telemetry',
   state: 'damx:state',
   connection: 'damx:connection',
+  /** Fires when a candidate key is pressed during setup detection. */
+  nitroKey: 'damx:nitro-key',
 } as const;
 
 export type Services = {
   client: DamxClient;
   internals: InternalsManager;
   telemetry: TelemetryPoller;
+  nitroKey: NitroKey;
 };
 
 type Handler = (services: Services, args: Record<string, unknown>) => Promise<unknown>;
@@ -85,6 +90,33 @@ const HANDLERS: Record<string, Handler> = {
   // than collapsed into one boolean — a fan-speed failure must not be
   // hidden behind a successful CPU-mode change or vice versa.
   getPowerState: async () => readPowerState(),
+
+  // --- NitroSense key setup -------------------------------------------
+  // Detection works by binding every candidate at once and seeing which one
+  // relaunches us; see electron/nitro-key.ts for why listening is not an
+  // option here.
+  nitroKeyState: async ({ nitroKey }) => ({
+    ...(await nitroKey.config()),
+    available: await nitroKeyAvailable(),
+    candidates: [...CANDIDATES],
+  }),
+  nitroKeyBegin: async ({ nitroKey }) => ({ ok: await nitroKey.beginDetection() }),
+  nitroKeyConfirm: async ({ nitroKey }, a) => {
+    const accel = nonEmptyString(a.accelerator, 'accelerator');
+    if (!(CANDIDATES as readonly string[]).includes(accel)) {
+      throw new Error(`Unknown accelerator: ${accel}`);
+    }
+    await nitroKey.confirm(accel);
+    return { ok: true };
+  },
+  nitroKeyDecline: async ({ nitroKey }) => {
+    await nitroKey.decline();
+    return { ok: true };
+  },
+  nitroKeyCancel: async ({ nitroKey }) => {
+    await nitroKey.clearBindings();
+    return { ok: true };
+  },
   setPowerMode: async ({ client }, a) => {
     const mode = powerMode(a.mode);
     const target = targetFor(mode);

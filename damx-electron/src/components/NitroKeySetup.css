@@ -1,0 +1,108 @@
+.nks-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(4, 3, 2, 0.72);
+  backdrop-filter: blur(3px);
+  animation: nks-fade 180ms ease-out both;
+}
+@keyframes nks-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.nks-card {
+  width: min(460px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 30px 32px 26px;
+  text-align: center;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-panel-solid);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.6);
+  animation: nks-rise 200ms ease-out both;
+}
+@keyframes nks-rise {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+.nks-mark { filter: drop-shadow(0 0 14px var(--accent-dim)); }
+
+.nks-card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.nks-card p {
+  margin: 0;
+  max-width: 44ch;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.nks-card code {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-raised);
+  font-size: 11.5px;
+  color: var(--accent-bright);
+}
+
+.nks-actions { display: flex; gap: 10px; margin-top: 4px; }
+
+.nks-primary,
+.nks-ghost {
+  padding: 9px 18px;
+  border-radius: var(--radius);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.nks-primary {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+  box-shadow: var(--glow);
+}
+.nks-primary:hover { background: var(--accent-bright); border-color: var(--accent-bright); }
+.nks-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.nks-ghost:hover { border-color: var(--border-strong); color: var(--text); }
+
+/* Indeterminate: we cannot know when the user will press the key. */
+.nks-bar {
+  width: 190px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-faint);
+  overflow: hidden;
+}
+.nks-bar i {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+  animation: nks-sweep 1.15s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes nks-sweep {
+  from { transform: translateX(-110%); }
+  to   { transform: translateX(340%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nks-backdrop, .nks-card, .nks-bar i { animation: none; }
+}
