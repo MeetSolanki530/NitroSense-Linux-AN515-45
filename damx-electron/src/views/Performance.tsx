@@ -104,10 +104,13 @@ export function Performance({
       >
         {unreadable && (
           <p className="profile-warning">
-            The driver reports the available profiles but cannot read the current one
-            (<code>platform_profile</code> returns an I/O error). Selecting a mode may
-            also fail. Acer firmware commonly restricts thermal profiles while on
-            battery — try again with the charger connected.
+            The driver lists the available profiles but cannot read the current one:
+            <code>platform_profile</code> returns an I/O error, on both the legacy
+            <code>/sys/firmware/acpi</code> path and the newer
+            <code>/sys/class/platform-profile</code> class. Confirmed on AC as well as
+            on battery, so it is a driver/firmware limitation on this model rather than
+            a power-source restriction. Selecting a mode below will most likely fail —
+            the exact error is shown if it does.
           </p>
         )}
         {choices.length === 0 ? (

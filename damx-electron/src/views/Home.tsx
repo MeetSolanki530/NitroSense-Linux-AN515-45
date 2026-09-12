@@ -16,7 +16,7 @@ import { Sparkline } from '../components/Sparkline';
 import { NitroMark } from '../components/NitroMark';
 import { useHistory } from '../state/history';
 import type { Settings, Telemetry } from '../state/damx';
-import { fanLabel, prettyMode } from './homeFormat';
+import { fanLabel, prettyMode, profileUnreadable } from './homeFormat';
 import './Home.css';
 
 type Props = {
@@ -33,7 +33,13 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
   const gpuHistory = useHistory(gpuUsage);
   const cpuHistory = useHistory(cpuUsage);
 
-  const mode = prettyMode(settings?.thermal_profile?.current);
+  // An empty current alongside a populated choice list means the driver
+  // could not read it — that is "unavailable", not an unknown mode.
+  const unreadable = profileUnreadable(
+    settings?.thermal_profile?.current,
+    settings?.thermal_profile?.available,
+  );
+  const mode = unreadable ? 'Unavailable' : prettyMode(settings?.thermal_profile?.current);
 
   return (
     <div className="home">
@@ -82,7 +88,11 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
           <dl className="widget-rows">
             <div className="widget-row">
               <dt>Mode</dt>
-              <dd>{has('thermal_profile') ? mode : <span className="dim">unavailable</span>}</dd>
+              <dd>
+                {!has('thermal_profile') || unreadable
+                  ? <span className="dim">unavailable</span>
+                  : mode}
+              </dd>
             </div>
             <div className="widget-row">
               <dt>Fan</dt>
