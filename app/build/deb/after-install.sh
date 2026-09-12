@@ -81,7 +81,7 @@ if [ -f "$DAEMON_SRC/nitrosense-daemon.py" ]; then
   cat > "$SERVICE" <<'UNIT'
 [Unit]
 Description=NitroSense hardware service
-Documentation=https://github.com/PXDiv/Div-Acer-Manager-Max
+Documentation=https://github.com/MeetSolanki530/NitroSense-Linux-AN515-45
 # The driver must exist before this can read or write anything through it.
 After=systemd-modules-load.service
 Wants=systemd-modules-load.service

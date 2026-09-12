@@ -2,10 +2,11 @@
   "name": "nitrosense",
   "version": "0.1.0",
   "description": "NitroSense for Linux: fan, power, battery and keyboard-lighting control for Acer Nitro laptops",
-  "homepage": "https://github.com/PXDiv/Div-Acer-Manager-Max",
+  "homepage": "https://github.com/MeetSolanki530/NitroSense-Linux-AN515-45",
+  "license": "MIT",
   "author": {
-    "name": "tr-dotcom",
-    "email": "tr@eaxmedia.com"
+    "name": "MeetSolanki530",
+    "email": "solankimeet530@gmail.com"
   },
   "private": true,
   "type": "module",
@@ -84,7 +85,7 @@
         "deb"
       ],
       "category": "Settings;HardwareSettings",
-      "maintainer": "tr-dotcom <tr@eaxmedia.com>",
+      "maintainer": "MeetSolanki530 <solankimeet530@gmail.com>",
       "icon": "build/icons",
       "executableName": "nitrosense",
       "desktop": {
