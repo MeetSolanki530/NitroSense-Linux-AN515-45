@@ -5,12 +5,20 @@
  * window. The renderer is pure presentation and never touches net, fs or
  * child_process.
  *
- * Single-instance lock matters here beyond the usual reason. The Nitro key is
- * handled by nitro-key-detection.service, which guards with
- *   pgrep -f "/opt/damx/gui/DivAcerManagerMax"
- * before launching. If that guard ever fails to match, the lock keeps a
- * second press from opening a duplicate window — it focuses the existing one
- * instead.
+ * The single-instance lock does three jobs here, not one.
+ *
+ *  1. The usual one: a second launch focuses the existing window.
+ *
+ *  2. It backstops the Nitro key. A packaged install is launched by
+ *     nitro-key-detection.service, which guards with
+ *       pgrep -f "/opt/damx/gui/DivAcerManagerMax"
+ *     and if that guard ever fails to match, the lock still keeps a second
+ *     press from opening a duplicate window.
+ *
+ *  3. It is how the key is identified during setup. The relaunch carries a
+ *     marker in its argv naming which candidate key fired, and the lock
+ *     delivers that argv to the running app. See electron/nitro-key.ts for
+ *     why detection has to work this way.
  */
 
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
