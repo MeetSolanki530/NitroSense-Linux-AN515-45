@@ -16,10 +16,10 @@ MDIR="/lib/modules/$KVER/kernel/drivers/platform/x86"
 echo "NitroSense: removing hardware support"
 
 # ------------------------------------------------------------------ service
-# Ours, plus anything an older install may have left that we stood down on
-# install. Leaving one of those disabled-but-present would resurrect a service
-# for software that is no longer here.
-for unit in nitrosense-daemon.service damx-daemon.service linuwu_sense.service; do
+# Ours, plus the driver's own unit that install stood down. Leaving one of
+# those disabled-but-present would resurrect a service for software that is no
+# longer here.
+for unit in nitrosense-daemon.service linuwu_sense.service; do
   if [ -f "/etc/systemd/system/$unit" ]; then
     systemctl stop "$unit" 2>/dev/null || true
     systemctl disable "$unit" >/dev/null 2>&1 || true
@@ -27,7 +27,7 @@ for unit in nitrosense-daemon.service damx-daemon.service linuwu_sense.service; 
   fi
 done
 systemctl daemon-reload 2>/dev/null || true
-rm -f /var/run/nitrosense.sock /var/run/DAMX.sock
+rm -f /var/run/nitrosense.sock
 rm -rf /opt/NitroSense/backend
 
 # ------------------------------------------------------------------ driver

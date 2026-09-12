@@ -35,18 +35,15 @@ const BASE = '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings';
 const ENTRY_NAME = 'NitroSense';
 
 /**
- * Names a shortcut of ours may carry, newest first.
+ * Whether a shortcut belongs to us.
  *
- * The name is a lookup key, not decoration: an existing binding is found by
- * it, and that is what stops the app asking to set the key up again. So a
- * rename orphans every shortcut written by an earlier version, and the user
- * gets asked again for a key that already works. Old names stay listed here
- * for exactly that reason.
+ * The name is a lookup key, not decoration: an existing shortcut is found by
+ * it, and finding it is what stops the app asking to set up a key that already
+ * works. Renaming it in a later version would orphan every shortcut written by
+ * this one, so if that ever happens, the old name has to stay recognised here.
  */
-const KNOWN_ENTRY_NAMES = [ENTRY_NAME, 'Div Acer Manager Max'];
-
 function isOurs(name: string): boolean {
-  return KNOWN_ENTRY_NAMES.some((n) => name.includes(n));
+  return name.includes(ENTRY_NAME);
 }
 
 /**

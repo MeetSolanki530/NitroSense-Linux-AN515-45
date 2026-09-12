@@ -74,10 +74,10 @@ install_driver() {
 install_driver || true
 
 # ------------------------------------------------------------------ service
-# An older install of a related tool may have left a service that binds the
-# same socket. Two of them fighting over it is worse than either alone, so
-# stand any down before starting ours.
-for legacy in damx-daemon.service linuwu_sense.service; do
+# The kernel driver ships a service of its own, and installing it by hand
+# leaves that behind. Ours supersedes it, and two services touching the same
+# hardware is worse than either alone, so stand it down first.
+for legacy in linuwu_sense.service; do
   if [ -f "/etc/systemd/system/$legacy" ]; then
     say "standing down a leftover $legacy"
     systemctl stop "$legacy" 2>/dev/null || true
