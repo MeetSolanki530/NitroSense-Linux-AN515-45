@@ -365,53 +365,52 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
 /**
  * Why no lighting controls are available.
  *
- * The driver only creates its four_zoned_kb sysfs group when
+ * The driver creates its four_zoned_kb sysfs group only when
  *     quirks->four_zone_kb || enable_all
- * (linuwu_sense.c:4535). This model's quirk entry sets four_zone_kb = 0, so
- * nitro_v4 never creates the node. enable_all forces it on and the node does
- * appear — but confirmed with two direct writes (a static colour, a breathing
- * effect), the ACPI calls report success and the keyboard never visibly
- * changes. Same signature as lcd_override: reports success, no hardware
- * effect. enable_all also stacks predator_v4 quirks on top of nitro_v4, which
- * changes how the RGB-brightness hotkeys (Fn+F9/F10) are decoded — not worth
- * that cost for a control that does nothing, so this is treated as confirmed
- * non-functional rather than "try enable_all".
+ * and find_quirks() returns early for a forced nitro_v4/predator_v4 BEFORE
+ * DMI matching runs. So a forced module parameter is the usual reason the
+ * node is missing on a machine that does have the hardware: it discards the
+ * DMI entry that would have set four_zone_kb.
+ *
+ * An earlier version of this note claimed the backlight was confirmed dead on
+ * AN515-45. That was wrong. The writes were being accepted and ignored
+ * because the payload shape was wrong (see patches/), not because the
+ * hardware was absent.
  */
 function NoLightingNote({
   hasFourZoneKb, parameter,
 }: { hasFourZoneKb: boolean; parameter: string }): JSX.Element {
-  const triedEnableAll = parameter === 'enable_all';
+  const forced = parameter === 'nitro_v4' || parameter === 'predator_v4';
 
   return (
     <section className="panel no-lighting">
       <h2 className="panel-title">Keyboard lighting unavailable</h2>
-      {triedEnableAll ? (
-        <>
-          <p>
-            The driver is loaded with <code>enable_all</code>, which forces the
-            zoned-keyboard node on regardless of the model quirk, and the node still
-            did not appear. That points at the controller genuinely being absent on
-            this machine.
-          </p>
-          <p className="dim">
-            Backlight brightness, if the keyboard has it, stays on the Fn keys.
-          </p>
-        </>
+      {forced ? (
+        <p>
+          The driver was loaded with <code>{parameter}</code>, which makes it skip
+          DMI matching entirely — and DMI matching is where this model&rsquo;s
+          four-zone keyboard is declared. Reload without a module parameter:
+          {' '}<code>sudo ./scripts/try-driver.sh</code>
+        </p>
       ) : (
         <>
           <p>
-            Confirmed non-functional on this hardware, not just unreported. Loading the
-            driver with <code>enable_all</code> does create the per-zone and four-zone
-            controls, but two direct writes (a static colour, a breathing effect) both
-            reported success while the keyboard never visibly changed. Same class of
-            firmware gap as LCD override and thermal-mode switching.
+            The driver did not report a four-zone keyboard for this machine
+            {parameter !== '' && <> with <code>{parameter}</code> applied</>}.
           </p>
           <p className="dim">
-            <code>enable_all</code> also changes how the RGB-brightness hotkeys
-            (Fn+F9/F10) are decoded, so it is not worth loading just to re-confirm this.
-            Stay on plain <code>nitro_v4</code> for the features that do work.
+            If this model does have one, it needs a DMI quirk entry declaring
+            <code> four_zone_kb</code>. Check the name the driver matches on with
+            {' '}<code>cat /sys/class/dmi/id/product_name</code>, and see
+            {' '}<code>patches/</code> for the AN515-45 entry as a worked example.
           </p>
         </>
+      )}
+      {hasFourZoneKb && (
+        <p className="dim">
+          The daemon does report four-zone keyboard hardware, so the controls
+          should appear once the driver exposes the node.
+        </p>
       )}
     </section>
   );
