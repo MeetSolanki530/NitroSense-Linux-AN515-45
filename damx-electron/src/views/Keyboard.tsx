@@ -106,7 +106,7 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
           ))}
         </div>
         <p className="control-hint dim">
-          Indicative only — it shows the per-zone colours, not a live capture of the keyboard.
+          Indicative only: it shows the per-zone colours, not a live capture of the keyboard.
         </p>
       </section>
 

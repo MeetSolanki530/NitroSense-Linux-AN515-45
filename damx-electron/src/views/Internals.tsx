@@ -86,8 +86,8 @@ const ACTIONS: Action[] = [
 ];
 
 const KIND_LABEL: Record<Action['kind'], string> = {
-  force: 'Temporary — lost on reboot',
-  persist: 'Persistent — survives reboot',
+  force: 'Temporary, lost on reboot',
+  persist: 'Persistent, survives reboot',
   recovery: 'Recovery',
 };
 

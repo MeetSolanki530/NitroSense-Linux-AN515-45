@@ -23,24 +23,28 @@ export function toBool(raw: unknown): Tri {
 
 /**
  * The driver writes -1 for backlight_timeout, boot_animation_sound and
- * lcd_override on this model — but that does NOT mean the feature is
- * unimplemented. Traced against the driver source (linuwu_sense.c): the WMI
- * GET call for all three succeeds every time; the show() function just
- * compares the raw result against hardcoded magic constants lifted from a
- * different Acer model, and anything that doesn't match falls into a "-1"
- * catch-all — even a clean value like `1` (confirmed via dmesg:
- * `boot_animation_sound get status: 1` still yields sysfs content "-1",
- * because 1 is neither of the two constants the driver recognises).
+ * lcd_override on this model when GET returns a raw value outside its
+ * hardcoded lookup table (magic constants lifted from a different Acer
+ * model) — a decode gap, not proof the feature is unimplemented. Confirmed
+ * via dmesg: `boot_animation_sound get status: 1` still yielded sysfs "-1",
+ * because 1 matched neither constant the driver recognised (now fixed to
+ * recognise it, see linuwu_sense.c's predator_boot_animation_sound_show).
  *
- * Critically, SET does not depend on decoding GET at all — it writes fixed
- * constants of its own. Confirmed directly: writing 1 to backlight_timeout
- * logged `backlight_timeout set status: 0` with no ACPI failure, twice, on
- * real hardware. So "-1" means "this model's GET response isn't in the
- * driver's lookup table", not "not supported" — the toggle must stay
- * usable, only the displayed current-state must fall back to unknown
- * (toBool('-1') already returns null for exactly this reason).
+ * That decode gap is a GET-side problem, and SET does not depend on it — it
+ * writes its own fixed constants. This held for backlight_timeout: a direct
+ * write logged `set status: 0` with no ACPI failure, and its readout later
+ * resolved to a real value on its own.
  *
- * Kept for the explanatory hint in the UI, not to disable anything.
+ * It did NOT hold for lcd_override: five direct writes each logged `set
+ * status: 0`, and the GET readback never changed even once across all of
+ * them. That is a stronger, different finding — the hardware genuinely does
+ * not respond, not merely an unreadable state — so lcd_override is disabled
+ * outright (Toggle's `broken` prop) rather than left inviting a click that
+ * can never do anything. This detector only classifies the raw sysfs value;
+ * it is the caller's job to decide unknown-but-usable vs. confirmed-broken.
+ *
+ * Kept for the explanatory hint in the UI, not to disable anything on its
+ * own.
  */
 export function isUnsupported(raw: unknown): boolean {
   return typeof raw === 'string' && raw.trim() === '-1';

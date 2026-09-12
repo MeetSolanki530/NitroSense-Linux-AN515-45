@@ -38,12 +38,16 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
   const usb = usbLevel(settings);
 
   // The driver's GET decoder doesn't recognise this model's raw WMI
-  // response for these three, so the current state always reads back
-  // unknown — but SET is independent of that decoder and does work
-  // (confirmed: backlight_timeout set status: 0, no ACPI failure, on real
-  // hardware). Used only to explain the "unknown" readout below, never to
-  // disable the toggle — see format.ts's isUnsupported doc for the trace.
-  const lcdUnreadable = settingUnsupported(settings, 'lcd_override');
+  // response for some of these, so the current state can read back
+  // unknown even though SET is independent of that decoder and does work
+  // (confirmed: backlight_timeout set status: 0, no ACPI failure, and its
+  // readout later resolved to a real value). Used only to explain an
+  // "unknown" readout, never to disable a toggle on its own.
+  //
+  // lcd_override is excluded from that claim: repeated direct writes were
+  // confirmed to have no hardware effect at all (see the `broken` prop on
+  // its Toggle below), which is a different, stronger finding than "merely
+  // unreadable" — so it must not appear in the shared "still works" hint.
   const bootUnreadable = settingUnsupported(settings, 'boot_animation_sound');
   const backlightUnreadable = settingUnsupported(settings, 'backlight_timeout');
 
@@ -165,6 +169,13 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
           value={lcd}
           busy={busy}
           disabled={!connected || !has('lcd_override')}
+          broken={
+            connected && has('lcd_override')
+              ? 'Confirmed non-functional on this hardware: 5 direct writes each reported success, ' +
+                'and the driver’s own readback never changed even once. Same class of firmware ' +
+                'gap as thermal-mode switching.'
+              : undefined
+          }
           onChange={(next) => void run(() => window.damx.setLcdOverride(next))}
         />
         <Toggle
@@ -184,10 +195,10 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
           onChange={(next) => void run(() => window.damx.setBacklightTimeout(next))}
         />
         <MissingNote has={has} features={['lcd_override', 'boot_animation_sound', 'backlight_timeout']} />
-        {(lcdUnreadable || bootUnreadable || backlightUnreadable) && (
+        {(bootUnreadable || backlightUnreadable) && (
           <p className="control-hint dim">
             Controls marked “unknown” can&rsquo;t have their current state confirmed on
-            this model — the driver&rsquo;s decoder doesn&rsquo;t recognise the value it
+            this model, since the driver&rsquo;s decoder doesn&rsquo;t recognise the value it
             gets back. Setting them still works; the switch just can&rsquo;t show whether
             it&rsquo;s currently on or off.
           </p>

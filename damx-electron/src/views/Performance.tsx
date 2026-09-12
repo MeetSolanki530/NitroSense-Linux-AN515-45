@@ -176,7 +176,7 @@ export function Performance({
         hint={
           gate.ok
             ? `Switches CPU governor and power preference (${powerState?.driver ?? 'amd-pstate-epp'}) ` +
-              'and adjusts fan speed to match. Independent of the daemon — this keeps working even ' +
+              'and adjusts fan speed to match. Independent of the daemon, so this keeps working even ' +
               'if it is offline.'
             : undefined
         }
