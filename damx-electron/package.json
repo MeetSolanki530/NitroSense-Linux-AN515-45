@@ -1,0 +1,10 @@
+{
+  "name": "damx-electron",
+  "version": "0.1.0",
+  "private": true,
+  "description": "React/Electron frontend for the DAMX daemon (Div Acer Manager Max)",
+  "type": "module",
+  "scripts": {
+    "probe": "node scripts/probe.ts"
+  }
+}
