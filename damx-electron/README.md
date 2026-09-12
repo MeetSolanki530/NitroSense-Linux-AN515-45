@@ -148,8 +148,8 @@ bug. Fan `0/0` means automatic; switching to Manual does not write until a
 slider actually moves.
 
 ```bash
-npm test          # validation, telemetry, formatting  (94 assertions)
-npm run test:e2e  # real writes through the full chain (19 assertions)
+npm test          # validation, telemetry, formatting  (130 assertions)
+npm run test:e2e  # real writes through the full chain (25 assertions)
 ```
 
 The e2e suite launches the actual Electron app against the mock daemon and
@@ -176,6 +176,28 @@ becomes operable — the others fire on a single click.
 USB charging offers exactly the four levels the daemon accepts (Off/10/20/30);
 an off-grid value read back from the driver shows as unreadable rather than
 being silently rounded.
+
+## Step 8 — keyboard RGB (done)
+
+Per-zone colours and four-zone effects. The two are independent driver
+features, so each is gated on its own entry in `available_features` rather
+than a shared "has RGB" assumption — a machine may report one, both, or
+neither.
+
+Effect names come from the daemon's own table (`DAMX-Daemon.py:652`):
+Static, Breathing, Neon, Wave, Shifting, Zoom, Meteor, Twinkling. Two details
+are surfaced honestly rather than hidden:
+
+- **Static** goes through a different daemon code path that ignores speed and
+  direction, so both controls are disabled for it.
+- **Wave and Shifting map to the same native effect** on this hardware
+  (`0x07`), which the UI says rather than implying they differ.
+- **Direction** only applies to Wave and Shifting.
+
+Writes are explicit (Apply) rather than live-on-drag: each is a sysfs write to
+the keyboard controller, and streaming them while a colour picker is dragged
+would hammer the device through a single-in-flight transport. Edits in
+progress are never overwritten by a background poll.
 
 ## Protocol notes
 

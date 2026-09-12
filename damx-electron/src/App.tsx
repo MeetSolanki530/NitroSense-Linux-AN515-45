@@ -5,6 +5,7 @@ import { Placeholder } from './views/Placeholder';
 import { Home } from './views/Home';
 import { Performance } from './views/Performance';
 import { Battery } from './views/Battery';
+import { Keyboard } from './views/Keyboard';
 import { useConnection, useSettings, useTelemetry } from './state/damx';
 import './components/TitleBar.css';
 import './App.css';
@@ -71,8 +72,7 @@ export function App(): JSX.Element {
             connection={connection} refresh={refresh} />
         )}
         {active === 'keyboard' && (
-          <Placeholder title="Keyboard Lighting" step="step 8" has={has}
-            requires={['per_zone_mode', 'four_zone_mode']} />
+          <Keyboard settings={settings} has={has} connection={connection} refresh={refresh} />
         )}
         {active === 'monitoring' && (
           <Placeholder title="Monitoring" step="step 5" has={has} requires={[]} />

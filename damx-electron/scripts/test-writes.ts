@@ -127,7 +127,36 @@ async function main(): Promise<void> {
     check('backlight timeout set', r5.backlight === '1', r5.backlight);
     check('usb charging set to 30', r5.usb === '30', r5.usb);
 
-    console.log('\n5. Unknown methods are unreachable from the renderer');
+    console.log('\n5. Keyboard lighting round-trips');
+    const r7 = (await runInRenderer(`
+      (async () => {
+        const out = {};
+        await window.damx.setPerZoneMode(['112233','445566','778899','aabbcc'], 75);
+        out.perZone = (await window.damx.getSettings()).per_zone_mode;
+        await window.damx.setFourZoneMode({ mode: 3, speed: 7, brightness: 90,
+                                            direction: 2, red: 255, green: 106, blue: 0 });
+        out.fourZone = (await window.damx.getSettings()).four_zone_mode;
+        try { await window.damx.setPerZoneMode(['#112233','445566','778899','aabbcc'], 75); out.hashZone = 'ACCEPTED'; }
+        catch (e) { out.hashZone = e.message; }
+        try { await window.damx.setPerZoneMode(['112233','445566'], 75); out.shortZones = 'ACCEPTED'; }
+        catch (e) { out.shortZones = e.message; }
+        try { await window.damx.setFourZoneMode({ mode: 9, speed: 1, brightness: 50,
+                                                  direction: 1, red: 0, green: 0, blue: 0 }); out.badMode = 'ACCEPTED'; }
+        catch (e) { out.badMode = e.message; }
+        out.after = (await window.damx.getSettings()).per_zone_mode;
+        return out;
+      })()
+    `)) as Record<string, string>;
+    check('per-zone colours round-trip',
+      r7.perZone === '112233,445566,778899,aabbcc,75', r7.perZone);
+    check('four-zone effect round-trips', r7.fourZone === '3,7,90,2,255,106,0', r7.fourZone);
+    check('rejects a "#"-prefixed zone colour', /hex colour/.test(r7.hashZone ?? ''), r7.hashZone);
+    check('rejects fewer than four zones', /exactly 4/.test(r7.shortZones ?? ''), r7.shortZones);
+    check('rejects effect mode 9', /between 0 and 7/.test(r7.badMode ?? ''), r7.badMode);
+    check('state unchanged after rejections',
+      r7.after === '112233,445566,778899,aabbcc,75', r7.after);
+
+    console.log('\n6. Unknown methods are unreachable from the renderer');
     const r6 = (await runInRenderer(`
       (async () => ({
         keys: Object.keys(window.damx).length,

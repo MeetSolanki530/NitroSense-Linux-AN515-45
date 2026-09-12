@@ -32,7 +32,7 @@ BASE_FEATURES = ["thermal_profile"]
 FORCED_FEATURES = [
     "thermal_profile", "backlight_timeout", "battery_calibration",
     "battery_limiter", "boot_animation_sound", "fan_speed",
-    "lcd_override", "usb_charging", "four_zone_mode",
+    "lcd_override", "usb_charging", "four_zone_mode", "per_zone_mode",
 ]
 
 DISRUPTIVE = {
@@ -68,6 +68,8 @@ state = {
         "lcd_override": "0",
     },
     "usb_charging": "10",
+    "per_zone": "ff0000,00ff00,0000ff,ffffff,100",
+    "four_zone": "0,0,100,1,255,106,0",
 }
 
 PROFILES = ["low-power", "balanced", "performance"]
@@ -99,7 +101,9 @@ def settings():
     if "usb_charging" in f:
         s["usb_charging"] = state["usb_charging"]
     if "four_zone_mode" in f:
-        s["four_zone_mode"] = "0,0,100,1,255,80,0"
+        s["four_zone_mode"] = state["four_zone"]
+    if "per_zone_mode" in f:
+        s["per_zone_mode"] = state["per_zone"]
     return s
 
 
@@ -167,6 +171,35 @@ def handle(conn):
                     state["toggles"][key] = "1" if enabled else "0"
                 resp = {"success": ok, "data": {"enabled": enabled} if ok else None,
                         "error": None if ok else f"Failed to set {key}"}
+
+            elif cmd == "set_per_zone_mode":
+                zones = [params.get(f"zone{i}", "") for i in range(1, 5)]
+                bright = params.get("brightness", 100)
+                ok = ("per_zone_mode" in features()
+                      and all(isinstance(z, str) and len(z) == 6 for z in zones)
+                      and isinstance(bright, int) and 0 <= bright <= 100)
+                try:
+                    for z in zones:
+                        int(z, 16)
+                except (ValueError, TypeError):
+                    ok = False
+                if ok:
+                    state["per_zone"] = ",".join(zones) + f",{bright}"
+                resp = {"success": ok, "data": {"brightness": bright} if ok else None,
+                        "error": None if ok else "Failed to set per-zone mode"}
+
+            elif cmd == "set_four_zone_mode":
+                m = params.get("mode", 0); sp = params.get("speed", 0)
+                br = params.get("brightness", 100); d = params.get("direction", 1)
+                r = params.get("red", 0); g = params.get("green", 0); b = params.get("blue", 0)
+                ok = ("four_zone_mode" in features()
+                      and all(isinstance(v, int) for v in (m, sp, br, d, r, g, b))
+                      and 0 <= m <= 7 and 0 <= sp <= 9 and 0 <= br <= 100
+                      and d in (1, 2) and all(0 <= v <= 255 for v in (r, g, b)))
+                if ok:
+                    state["four_zone"] = f"{m},{sp},{br},{d},{r},{g},{b}"
+                resp = {"success": ok, "data": {"mode": m} if ok else None,
+                        "error": None if ok else "Failed to set four-zone mode"}
 
             elif cmd == "get_thermal_profile":
                 resp = {"success": True,
