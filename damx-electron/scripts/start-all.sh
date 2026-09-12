@@ -79,6 +79,18 @@ mkdir -p "$LOGDIR"
 
 # ---------------------------------------------------------------- sudo once
 step "Authorising"
+if ! command -v sudo >/dev/null 2>&1; then
+  red "  sudo is not available in this environment."
+  echo ""
+  echo "  The driver and daemon need root, so this script cannot run here."
+  echo "  A sandboxed shell (Flatpak/snap, e.g. a Flatpak VS Code terminal)"
+  echo "  has no sudo and cannot see the host's /var/run or the daemon socket."
+  echo ""
+  echo "  Run it from a normal terminal instead. The app alone, without"
+  echo "  hardware controls, still works anywhere:"
+  echo "      npm run dev"
+  exit 1
+fi
 dim "  Needed for the kernel driver and the daemon only."
 sudo -v
 # Keep the sudo timestamp warm while the app runs.
