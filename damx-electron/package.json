@@ -13,7 +13,7 @@
     "dev": "node scripts/dev.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test-validate.ts && node scripts/test-telemetry.ts && node scripts/test-home.ts && node scripts/test-format.ts && node scripts/test-keyboard.ts && node scripts/test-series.ts",
-    "test:e2e": "node scripts/test-writes.ts",
+    "test:e2e": "node scripts/test-writes.ts && node scripts/test-fan-sync.ts",
     "package": "npm run build && electron-builder --linux dir deb",
     "package:dir": "npm run build && electron-builder --linux dir",
     "daemon:dev": "echo \"Run with sudo:  sudo ./scripts/run-daemon-dev.sh\""

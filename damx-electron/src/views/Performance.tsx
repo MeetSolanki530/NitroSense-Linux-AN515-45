@@ -6,7 +6,7 @@
  * the kernel reports, so hardcoding four tiles would offer modes this machine
  * cannot take.
  */
-import { useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import { ControlBlock, Slider, gateFor } from '../components/Control';
 import { ModeTile } from '../components/ModeTile';
 import { useCommand, useDebounced, useOptimistic } from '../state/useCommand';
@@ -50,31 +50,53 @@ export function Performance({
 
   const auto = isAuto(settings);
   const [manual, setManual] = useState(!auto);
+  // useState's initializer only runs at mount, when `settings` is still null
+  // (the first get_all_settings hasn't resolved yet) — isAuto(null) is always
+  // true, so this would otherwise show "Automatic" selected forever whenever
+  // the daemon's real fan_speed was already in manual mode when the app
+  // opened (e.g. left that way by a previous session), while the sliders
+  // underneath still displayed the true non-zero duty values. Sync once,
+  // the first time real settings arrive, so the toggle reflects hardware
+  // truth on load; after that, only explicit clicks (setAuto/enterManual)
+  // change it, preserving "entering Manual does not write until a slider
+  // moves" against the 5s settings poll.
+  const syncedInitialFanMode = useRef(false);
+  useEffect(() => {
+    if (!syncedInitialFanMode.current && settings) {
+      setManual(!isAuto(settings));
+      syncedInitialFanMode.current = true;
+    }
+  }, [settings]);
   const cpuFan = useOptimistic(fanValue(settings, 'cpu'));
   const gpuFan = useOptimistic(fanValue(settings, 'gpu'));
 
   const pushFan = useDebounced((cpu: number, gpu: number) => {
-    void run(() => window.damx.setFanSpeed(cpu, gpu)).then((ok) => {
-      if (!ok) {
-        cpuFan.reset();
-        gpuFan.reset();
-      }
+    // Reset unconditionally, not only on failure. useOptimistic clears
+    // `pending` when it matches the refreshed `actual` exactly — but run()
+    // has already awaited refresh() by the time this callback fires, so the
+    // true value is available now. Relying on equality alone would leave
+    // the requested number stuck on screen forever if the driver ever
+    // rounds or clamps it to something else on success (harmless today,
+    // since this daemon writes fan_speed verbatim, but the hook is shared
+    // and should not silently hide a future mismatch).
+    void run(() => window.damx.setFanSpeed(cpu, gpu)).then(() => {
+      cpuFan.reset();
+      gpuFan.reset();
     });
   }, 150);
 
   const selectProfile = (name: string): void => {
     profile.setPending(name);
-    void run(() => window.damx.setThermalProfile(name)).then((ok) => {
-      if (!ok) profile.reset();
-    });
+    void run(() => window.damx.setThermalProfile(name)).then(() => profile.reset());
   };
 
   const setAuto = (): void => {
     setManual(false);
     cpuFan.setPending(0);
     gpuFan.setPending(0);
-    void run(() => window.damx.setFanSpeed(0, 0)).then((ok) => {
-      if (!ok) { cpuFan.reset(); gpuFan.reset(); }
+    void run(() => window.damx.setFanSpeed(0, 0)).then(() => {
+      cpuFan.reset();
+      gpuFan.reset();
     });
   };
 

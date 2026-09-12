@@ -65,8 +65,11 @@ state = {
     "persistent": False,
     "broken": False,
     "profile": "" if "--eio-profile" in flags else "balanced",
-    "fan_cpu": 0,
-    "fan_gpu": 0,
+    # --start-manual-fan seeds a non-zero duty cycle from the very first
+    # get_all_settings, reproducing "manual mode was already active when the
+    # app opened" — a case the UI's initial-render guess must sync to.
+    "fan_cpu": 45 if "--start-manual-fan" in flags else 0,
+    "fan_gpu": 50 if "--start-manual-fan" in flags else 0,
     "toggles": {
         "backlight_timeout": "-1" if "--eio-profile" in flags else "0", "battery_calibration": "0",
         "battery_limiter": "1",
