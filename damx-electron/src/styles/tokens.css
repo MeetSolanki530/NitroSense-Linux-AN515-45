@@ -1,0 +1,111 @@
+/*
+ * Design tokens read off the NitroSense screenshots.
+ *
+ * The accent is mode-reactive: red at Performance, amber at Balanced. That is
+ * driven by [data-mode] on the root so any component can inherit it rather
+ * than each one re-deriving the colour.
+ */
+
+@font-face {
+  font-family: 'Oxanium';
+  src: url('/fonts/Oxanium.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Oxanium';
+  src: url('/fonts/Oxanium-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Open Sans';
+  src: url('/fonts/OpenSans.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Open Sans';
+  src: url('/fonts/OpenSans-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-display: swap;
+}
+
+:root {
+  /* Ground: near-black with a warm cast, not neutral grey. */
+  --bg-base: #0b0806;
+  --bg-deep: #070504;
+  --bg-panel: rgba(28, 16, 10, 0.72);
+  --bg-panel-solid: #150d09;
+  --bg-raised: rgba(58, 30, 16, 0.5);
+
+  /* Accents. --accent is remapped per mode below. */
+  --orange: #ff6a00;
+  --orange-bright: #ff8c2b;
+  --amber: #ffa61e;
+  --red: #e63b1e;
+  --red-bright: #ff4a2b;
+
+  --accent: var(--orange);
+  --accent-bright: var(--orange-bright);
+  --accent-dim: rgba(255, 106, 0, 0.35);
+  --accent-faint: rgba(255, 106, 0, 0.12);
+
+  --text: #f6ece2;
+  --text-muted: #b9a08c;
+  --text-dim: #7d6857;
+
+  --border: rgba(255, 122, 32, 0.28);
+  --border-strong: rgba(255, 122, 32, 0.55);
+
+  --ok: #4ade80;
+  --warn: #ffa61e;
+  --danger: #ff4a2b;
+
+  --font-display: 'Oxanium', 'Rajdhani', system-ui, sans-serif;
+  --font-body: 'Open Sans', system-ui, -apple-system, sans-serif;
+
+  --titlebar-h: 52px;
+  --radius: 4px;
+
+  --glow: 0 0 18px rgba(255, 106, 0, 0.22);
+  --glow-strong: 0 0 28px rgba(255, 106, 0, 0.4);
+
+  /* Beveled corners, the NitroSense panel signature. */
+  --bevel: 14px;
+  --panel-clip: polygon(
+    var(--bevel) 0,
+    100% 0,
+    100% calc(100% - var(--bevel)),
+    calc(100% - var(--bevel)) 100%,
+    0 100%,
+    0 var(--bevel)
+  );
+}
+
+:root[data-mode='performance'],
+:root[data-mode='turbo'] {
+  --accent: var(--red);
+  --accent-bright: var(--red-bright);
+  --accent-dim: rgba(230, 59, 30, 0.35);
+  --accent-faint: rgba(230, 59, 30, 0.12);
+  --border: rgba(255, 74, 43, 0.3);
+  --border-strong: rgba(255, 74, 43, 0.55);
+  --glow: 0 0 18px rgba(230, 59, 30, 0.25);
+  --glow-strong: 0 0 28px rgba(230, 59, 30, 0.45);
+}
+
+:root[data-mode='balanced'] {
+  --accent: var(--amber);
+  --accent-bright: #ffc257;
+  --accent-dim: rgba(255, 166, 30, 0.35);
+  --accent-faint: rgba(255, 166, 30, 0.12);
+}
+
+:root[data-mode='low-power'],
+:root[data-mode='quiet'] {
+  --accent: #ffb347;
+  --accent-bright: #ffd08a;
+  --accent-dim: rgba(255, 179, 71, 0.3);
+  --accent-faint: rgba(255, 179, 71, 0.1);
+}

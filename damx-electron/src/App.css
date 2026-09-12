@@ -1,0 +1,69 @@
+.banner {
+  flex: 0 0 auto;
+  padding: 9px 24px;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid transparent;
+}
+.banner-warn {
+  background: rgba(255, 166, 30, 0.12);
+  border-bottom-color: rgba(255, 166, 30, 0.35);
+  color: #ffd08a;
+}
+.banner-danger {
+  background: rgba(255, 74, 43, 0.12);
+  border-bottom-color: rgba(255, 74, 43, 0.35);
+  color: #ff9d86;
+}
+
+.placeholder { margin-bottom: 20px; }
+
+.req-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 7px; }
+.req-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  font-family: var(--font-body);
+}
+.req-list code {
+  font-family: var(--font-display);
+  letter-spacing: 0.03em;
+  color: var(--text);
+}
+.req-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+.req-ok .req-dot { background: var(--ok); box-shadow: 0 0 7px var(--ok); }
+.req-missing .req-dot { background: var(--text-dim); }
+.req-state { margin-left: auto; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.08em; }
+.req-ok .req-state { color: var(--ok); }
+.req-missing .req-state { color: var(--text-dim); }
+
+.probe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 12px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.stat-label {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent-bright);
+  text-shadow: 0 0 14px var(--accent-faint);
+}
+.stat-note { font-size: 10.5px; }
+.probe-foot { font-size: 11.5px; margin: 10px 0 0; }
