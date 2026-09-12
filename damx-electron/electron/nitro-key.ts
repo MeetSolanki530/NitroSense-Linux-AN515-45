@@ -60,12 +60,13 @@ export const CANDIDATES = [
 export const MARKER = '--nitro-key=';
 
 /**
- * Offered when the key turns out to be invisible to the OS.
+ * Offered when detection finds nothing.
  *
- * On some models — AN515-45 among them — the NitroSense key never reaches the
- * kernel at all: no WMI event, no input event. It is handled inside the EC.
- * Nothing can bind a key that produces no event, so the fallback is an
- * ordinary shortcut the user presses instead.
+ * Not every model's key reaches the desktop: some are handled entirely in
+ * firmware, and nothing can bind a key that produces no event. This is the
+ * escape hatch for those, not the expected path — AN515-45 reports cleanly as
+ * KEY_PRESENTATION, and an earlier version of this comment wrongly claimed
+ * otherwise after I tested the wrong input device.
  */
 export const FALLBACK_ACCELERATOR = '<Control><Alt>n';
 export const FALLBACK_LABEL = 'Ctrl+Alt+N';
@@ -109,14 +110,43 @@ export class NitroKey {
   }
 
   async config(): Promise<NitroKeyConfig> {
-    if (this.#loaded) return this.#config;
-    try {
-      this.#config = { ...EMPTY, ...JSON.parse(await readFile(this.#configPath, 'utf8')) };
-    } catch {
-      this.#config = { ...EMPTY };
+    if (!this.#loaded) {
+      try {
+        this.#config = { ...EMPTY, ...JSON.parse(await readFile(this.#configPath, 'utf8')) };
+      } catch {
+        this.#config = { ...EMPTY };
+      }
+      this.#loaded = true;
     }
-    this.#loaded = true;
+
+    // A binding can exist without our config saying so: setup-nitro-key.sh
+    // writes the shortcut directly, and a user may have made one by hand.
+    // Asking again when the key already works is worse than not asking, so
+    // believe the desktop's actual state over our own note about it.
+    if (!this.#config.decided) {
+      const live = await this.existingBinding();
+      if (live) await this.#save({ decided: true, accelerator: live });
+    }
     return this.#config;
+  }
+
+  /** The key currently bound to us, if any. */
+  async existingBinding(): Promise<string | null> {
+    if (!(await available())) return null;
+    for (const path of await this.#slots()) {
+      try {
+        const name = await run('gsettings', ['get', `${CUSTOM}:${path}`, 'name']);
+        if (!name.includes(ENTRY_NAME)) continue;
+        const binding = await run('gsettings', ['get', `${CUSTOM}:${path}`, 'binding']);
+        const value = binding.replace(/^'|'$/g, '');
+        // A detection run leaves several temporary bindings; those are not a
+        // decision, so ignore them and let setup carry on.
+        if (value && !name.includes('detecting')) return value;
+      } catch {
+        // Unreadable slot: skip rather than guess.
+      }
+    }
+    return null;
   }
 
   async #save(next: NitroKeyConfig): Promise<void> {
