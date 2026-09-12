@@ -63,6 +63,16 @@ export function modprobeParam(v: unknown): ModprobeParamName {
   return v as ModprobeParamName;
 }
 
+export const POWER_MODES = ['quiet', 'balanced', 'performance'] as const;
+export type PowerModeName = (typeof POWER_MODES)[number];
+
+export function powerMode(v: unknown): PowerModeName {
+  if (typeof v !== 'string' || !POWER_MODES.includes(v as PowerModeName)) {
+    throw new ValidationError(`mode must be one of ${POWER_MODES.join(', ')}`);
+  }
+  return v as PowerModeName;
+}
+
 export function nonEmptyString(v: unknown, label: string): string {
   if (typeof v !== 'string' || v.length === 0) {
     throw new ValidationError(`${label} must be a non-empty string`);

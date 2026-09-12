@@ -62,6 +62,27 @@ export type OperationResult = {
   error?: string;
 };
 
+/** Real thermal/performance mode — see electron/cpupower.ts. The daemon's
+ *  own thermal_profile is confirmed non-functional on this hardware. */
+export type PowerMode = 'quiet' | 'balanced' | 'performance';
+
+export type PowerState = {
+  available: boolean;
+  backend: 'power-profiles-daemon' | 'sysfs-pkexec' | 'unavailable';
+  driver: string | null;
+  governor: string | null;
+  epp: string | null;
+  availableGovernors: string[];
+  availableEpp: string[];
+  currentMode: PowerMode | null;
+};
+
+export type PowerModeResult = {
+  mode: PowerMode;
+  cpu: { ok: boolean; backend: PowerState['backend']; error?: string };
+  fan: { ok: boolean; error?: string };
+};
+
 declare global {
   interface Window {
     damx: {
@@ -70,6 +91,8 @@ declare global {
       getConnectionState(): Promise<ConnectionState>;
       setThermalProfile(profile: string): Promise<unknown>;
       setFanSpeed(cpu: number, gpu: number): Promise<unknown>;
+      getPowerState(): Promise<PowerState>;
+      setPowerMode(mode: PowerMode): Promise<PowerModeResult>;
       setBacklightTimeout(enabled: boolean): Promise<unknown>;
       setBatteryLimiter(enabled: boolean): Promise<unknown>;
       setBatteryCalibration(enabled: boolean): Promise<unknown>;
@@ -107,6 +130,32 @@ export function useConnection(): ConnectionState {
     return window.damx.onConnection(setState);
   }, []);
   return state;
+}
+
+export type PowerStateHook = { state: PowerState | null; refresh: () => Promise<void> };
+
+/**
+ * Real system mode (governor + EPP) — independent of the daemon entirely, so
+ * it gets its own poll rather than riding the daemon's settings refresh; it
+ * must keep working, and keep updating, even while the daemon is
+ * disconnected. Shared between Home (mode summary) and Performance (mode
+ * switching) so both stay consistent with each other.
+ */
+export function usePowerState(pollMs = 5_000): PowerStateHook {
+  const [state, setState] = useState<PowerState | null>(null);
+  const refresh = useCallback(async () => {
+    try {
+      setState(await window.damx.getPowerState());
+    } catch {
+      // Leave the last-known state rather than blank it on a transient error.
+    }
+  }, []);
+  useEffect(() => {
+    void refresh();
+    const id = setInterval(() => void refresh(), pollMs);
+    return () => clearInterval(id);
+  }, [refresh, pollMs]);
+  return { state, refresh };
 }
 
 export type SettingsHook = {

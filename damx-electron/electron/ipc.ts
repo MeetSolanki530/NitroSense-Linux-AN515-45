@@ -20,9 +20,10 @@ import type { ModprobeParam } from './internals.ts';
 import { TelemetryPoller } from './telemetry.ts';
 import {
   bool, fourZoneConfig, intInRange, modprobeParam, nonEmptyString,
-  usbChargingLevel, zoneColors,
+  powerMode, usbChargingLevel, zoneColors,
 } from './validate.ts';
 import type { Telemetry } from './telemetry.ts';
+import { applyPowerMode, readPowerState, targetFor } from './cpupower.ts';
 
 export const CH = {
   invoke: 'damx:invoke',
@@ -72,6 +73,34 @@ const HANDLERS: Record<string, Handler> = {
         gpu: intInRange(a.gpu, 0, 100, 'gpu'),
       }),
     ),
+
+  // ---- real thermal/performance mode switching ----
+  //
+  // The daemon's own thermal_profile is confirmed non-functional on this
+  // hardware (see electron/cpupower.ts's header comment for the full trace).
+  // This is the working replacement: CPU governor + energy_performance_
+  // preference via the standard amd-pstate-epp driver, combined with the
+  // daemon's own set_fan_speed (which DOES work) for the fan tier. Two
+  // independently-failable systems, so both outcomes are reported rather
+  // than collapsed into one boolean — a fan-speed failure must not be
+  // hidden behind a successful CPU-mode change or vice versa.
+  getPowerState: async () => readPowerState(),
+  setPowerMode: async ({ client }, a) => {
+    const mode = powerMode(a.mode);
+    const target = targetFor(mode);
+
+    const cpu = await applyPowerMode(mode);
+
+    let fan: { ok: boolean; error?: string };
+    try {
+      unwrap(await client.send('set_fan_speed', { cpu: target.cpuFan, gpu: target.gpuFan }));
+      fan = { ok: true };
+    } catch (e) {
+      fan = { ok: false, error: (e as Error).message };
+    }
+
+    return { mode, cpu, fan };
+  },
 
   // ---- toggles ----
   setBacklightTimeout: async ({ client }, a) =>

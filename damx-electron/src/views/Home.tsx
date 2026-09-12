@@ -15,8 +15,9 @@ import { FrequencyDial } from '../components/FrequencyDial';
 import { Sparkline } from '../components/Sparkline';
 import { NitroMark } from '../components/NitroMark';
 import { useHistory } from '../state/history';
+import { usePowerState } from '../state/damx';
 import type { Settings, Telemetry } from '../state/damx';
-import { fanLabel, prettyMode, profileUnreadable } from './homeFormat';
+import { fanLabel } from './homeFormat';
 import './Home.css';
 
 type Props = {
@@ -33,13 +34,14 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
   const gpuHistory = useHistory(gpuUsage);
   const cpuHistory = useHistory(cpuUsage);
 
-  // An empty current alongside a populated choice list means the driver
-  // could not read it — that is "unavailable", not an unknown mode.
-  const unreadable = profileUnreadable(
-    settings?.thermal_profile?.current,
-    settings?.thermal_profile?.available,
-  );
-  const mode = unreadable ? 'Unavailable' : prettyMode(settings?.thermal_profile?.current);
+  // The daemon's own thermal_profile is confirmed non-functional on this
+  // hardware (see electron/cpupower.ts for the full trace); the real,
+  // working mode comes from CPU governor+EPP instead, shared with
+  // Performance so both stay consistent with each other.
+  const { state: powerState } = usePowerState();
+  const modeLabel: Record<string, string> = { quiet: 'Quiet', balanced: 'Balanced', performance: 'Performance' };
+  const mode = powerState?.currentMode ? modeLabel[powerState.currentMode] : null;
+  const modeUnavailable = powerState !== null && !powerState.available;
 
   return (
     <div className="home">
@@ -85,7 +87,7 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
           </div>
           <div className="mode-block">
             <span className="mode-caption">System Mode</span>
-            <span className="mode-name">{mode}</span>
+            <span className="mode-name">{mode ?? (modeUnavailable ? 'Unavailable' : '—')}</span>
             <div className="mode-rule" />
           </div>
           <NitroMark />
@@ -110,9 +112,7 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
             <div className="widget-row">
               <dt>Mode</dt>
               <dd>
-                {!has('thermal_profile') || unreadable
-                  ? <span className="dim">unavailable</span>
-                  : mode}
+                {mode ?? <span className="dim">{modeUnavailable ? 'unavailable' : '—'}</span>}
               </dd>
             </div>
             <div className="widget-row">

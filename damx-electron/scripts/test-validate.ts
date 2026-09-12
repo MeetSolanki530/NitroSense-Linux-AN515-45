@@ -4,7 +4,7 @@
  */
 import {
   ValidationError, bool, fourZoneConfig, hexColor, intInRange,
-  modprobeParam, nonEmptyString, usbChargingLevel, zoneColors,
+  modprobeParam, nonEmptyString, powerMode, usbChargingLevel, zoneColors,
 } from '../electron/validate.ts';
 
 let passed = 0;
@@ -62,6 +62,14 @@ check('accepts nitro_v4', modprobeParam('nitro_v4') === 'nitro_v4');
 check('rejects arbitrary parameter', rejects(() => modprobeParam('rm -rf /')));
 check('rejects empty string', rejects(() => nonEmptyString('', 'profile')));
 check('rejects non-string profile', rejects(() => nonEmptyString(42, 'profile')));
+
+console.log('\n7. Real power mode (governor+EPP, replaces the dead thermal_profile)');
+check('accepts quiet', powerMode('quiet') === 'quiet');
+check('accepts balanced', powerMode('balanced') === 'balanced');
+check('accepts performance', powerMode('performance') === 'performance');
+check('rejects a daemon-style profile name', rejects(() => powerMode('low-power')));
+check('rejects garbage', rejects(() => powerMode('turbo')));
+check('rejects non-string', rejects(() => powerMode(1)));
 
 console.log(`\n${failed === 0 ? '\x1b[32m' : '\x1b[31m'}${passed} passed, ${failed} failed\x1b[0m\n`);
 process.exit(failed === 0 ? 0 : 1);

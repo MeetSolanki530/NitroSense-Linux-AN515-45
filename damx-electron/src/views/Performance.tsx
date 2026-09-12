@@ -1,17 +1,27 @@
 /**
- * Performance — thermal profile and fan control. The first view that writes.
+ * Performance — real system-mode switching, plus fan control.
  *
- * Mode tiles are built from the kernel's platform_profile_choices rather than
- * a fixed Quiet/Balanced/Performance/Turbo set: the daemon only accepts values
- * the kernel reports, so hardcoding four tiles would offer modes this machine
- * cannot take.
+ * The daemon's own thermal_profile is confirmed non-functional on this
+ * hardware: every restriction in both the third-party driver and (checked
+ * directly against its source) the mainline kernel driver was bypassed, two
+ * different target profiles were tested with full call-path logging, and the
+ * firmware never applied either — a documented, unresolved class of
+ * firmware/ACPI-exposure gap on this laptop family (see electron/cpupower.ts
+ * for the full trace), not a decode bug fixable in software.
+ *
+ * "System Mode" here is the real replacement: CPU governor +
+ * energy_performance_preference via this machine's own amd-pstate-epp
+ * driver, combined with the daemon's set_fan_speed (which DOES work) for the
+ * fan tier of each mode. It is independent of the daemon connection
+ * entirely — it still works with the daemon offline, since it never touches
+ * the socket for the CPU side.
  */
 import { useEffect, useRef, useState, type JSX } from 'react';
-import { ControlBlock, Slider, gateFor } from '../components/Control';
+import { ControlBlock, Slider, gateFor, type Gate } from '../components/Control';
 import { ModeTile } from '../components/ModeTile';
 import { useCommand, useDebounced, useOptimistic } from '../state/useCommand';
-import { prettyMode, profileUnreadable } from './homeFormat';
-import type { ConnectionState, Settings, Telemetry } from '../state/damx';
+import { usePowerState } from '../state/damx';
+import type { ConnectionState, PowerMode, PowerState, Settings, Telemetry } from '../state/damx';
 import './Performance.css';
 
 type Props = {
@@ -34,19 +44,45 @@ function fanValue(settings: Settings | null, key: 'cpu' | 'gpu'): number {
   return Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 0;
 }
 
+const POWER_MODES: PowerMode[] = ['quiet', 'balanced', 'performance'];
+const POWER_MODE_LABEL: Record<PowerMode, string> = {
+  quiet: 'Quiet',
+  balanced: 'Balanced',
+  performance: 'Performance',
+};
+
+function powerModeGate(state: PowerState | null): Gate {
+  if (state === null) return { ok: false, reason: 'Checking…' };
+  if (!state.available) {
+    return {
+      ok: false,
+      reason: state.driver
+        ? 'No supported backend (power-profiles-daemon or pkexec)'
+        : 'This CPU has no energy_performance_preference to control',
+    };
+  }
+  return { ok: true };
+}
+
 export function Performance({
   settings, telemetry, has, connection, refresh,
 }: Props): JSX.Element {
   const connected = connection === 'connected';
   const { run, busy, error, clearError } = useCommand(refresh);
 
-  const profileGate = gateFor('thermal_profile', has, connected);
   const fanGate = gateFor('fan_speed', has, connected);
 
-  const choices = settings?.thermal_profile?.available ?? [];
-  const currentProfile = settings?.thermal_profile?.current ?? '';
-  const profile = useOptimistic(currentProfile);
-  const unreadable = profileUnreadable(currentProfile, choices);
+  // Shared with Home, so both stay consistent — it is independent of the
+  // daemon entirely and must keep working (and updating) even while the
+  // daemon is disconnected.
+  const { state: powerState, refresh: reloadPowerState } = usePowerState();
+
+  const {
+    run: runMode, busy: modeBusy, error: modeError, clearError: clearModeError,
+  } = useCommand(reloadPowerState);
+
+  const gate = powerModeGate(powerState);
+  const currentMode = useOptimistic(powerState?.currentMode ?? null);
 
   const auto = isAuto(settings);
   const [manual, setManual] = useState(!auto);
@@ -57,9 +93,9 @@ export function Performance({
   // opened (e.g. left that way by a previous session), while the sliders
   // underneath still displayed the true non-zero duty values. Sync once,
   // the first time real settings arrive, so the toggle reflects hardware
-  // truth on load; after that, only explicit clicks (setAuto/enterManual)
-  // change it, preserving "entering Manual does not write until a slider
-  // moves" against the 5s settings poll.
+  // truth on load; after that, only explicit clicks (setAuto/enterManual/a
+  // System Mode selection) change it, preserving "entering Manual does not
+  // write until a slider moves" against the 5s settings poll.
   const syncedInitialFanMode = useRef(false);
   useEffect(() => {
     if (!syncedInitialFanMode.current && settings) {
@@ -85,11 +121,6 @@ export function Performance({
     });
   }, 150);
 
-  const selectProfile = (name: string): void => {
-    profile.setPending(name);
-    void run(() => window.damx.setThermalProfile(name)).then(() => profile.reset());
-  };
-
   const setAuto = (): void => {
     setManual(false);
     cpuFan.setPending(0);
@@ -106,60 +137,74 @@ export function Performance({
     // until the user actually moves a slider.
   };
 
+  const selectPowerMode = (mode: PowerMode): void => {
+    currentMode.setPending(mode);
+    // The mode drives fan speed too (Performance runs fans at maximum;
+    // Quiet/Balanced return them to automatic) — reflect that in the Fan
+    // Control section's own toggle immediately, otherwise it would keep
+    // showing whatever it last showed while the sliders underneath quietly
+    // display the new values. Optimistic here for the same reason the fan
+    // sliders are: real feedback shouldn't wait on a possibly-slow pkexec
+    // password prompt.
+    const goingManual = mode === 'performance';
+    setManual(goingManual);
+    if (!goingManual) { cpuFan.setPending(0); gpuFan.setPending(0); }
+
+    void runMode(() => window.damx.setPowerMode(mode)).then(() => {
+      currentMode.reset();
+      cpuFan.reset();
+      gpuFan.reset();
+    });
+  };
+
   return (
     <div className="performance">
-      {error && (
+      {(error || modeError) && (
         <div className="write-error" role="alert">
-          <span>{error}</span>
-          <button type="button" onClick={clearError} aria-label="Dismiss">×</button>
+          <span>{error ?? modeError}</span>
+          <button
+            type="button"
+            onClick={() => { clearError(); clearModeError(); }}
+            aria-label="Dismiss"
+          >×</button>
         </div>
       )}
 
       <ControlBlock
         title="System Mode"
-        gate={profileGate}
+        gate={gate}
         hint={
-          profileGate.ok
-            ? 'Modes come from the kernel’s platform_profile_choices, so only what this machine supports is offered.'
+          gate.ok
+            ? `Switches CPU governor and power preference (${powerState?.driver ?? 'amd-pstate-epp'}) ` +
+              'and adjusts fan speed to match. Independent of the daemon — this keeps working even ' +
+              'if it is offline.'
             : undefined
         }
       >
-        {unreadable && (
-          <p className="profile-warning">
-            <strong>Thermal profiles are not usable on this machine.</strong>{' '}
-            <code>platform_profile</code> returns an I/O error for both reads and
-            writes, on the legacy <code>/sys/firmware/acpi</code> path and the newer
-            <code>/sys/class/platform-profile</code> class alike. Confirmed with both{' '}
-            <code>nitro_v4</code> and <code>enable_all</code>, on AC and on battery, so
-            it is a driver/firmware limitation rather than a configuration or
-            power-source issue. The tiles are disabled because selecting one only ever
-            returns “Failed to set thermal profile”.
+        <div className="mode-tiles">
+          {POWER_MODES.map((mode) => (
+            <ModeTile
+              key={mode}
+              name={mode}
+              label={POWER_MODE_LABEL[mode]}
+              selected={currentMode.value === mode}
+              disabled={!gate.ok || modeBusy}
+              onSelect={() => selectPowerMode(mode)}
+            />
+          ))}
+        </div>
+        {gate.ok && powerState && (
+          <p className="control-hint dim">
+            {powerState.governor} · {powerState.epp}
+            {powerState.backend === 'sysfs-pkexec' && ' · applied directly (no power-profiles-daemon found)'}
           </p>
-        )}
-        {choices.length === 0 ? (
-          <p className="dim">No thermal profiles reported.</p>
-        ) : (
-          <div className="mode-tiles">
-            {choices.map((name) => (
-              <ModeTile
-                key={name}
-                name={name}
-                label={prettyMode(name)}
-                selected={profile.value === name}
-                // Writes fail with the same EIO as reads, so a clickable tile
-                // would only ever produce an error.
-                disabled={!profileGate.ok || busy || unreadable}
-                onSelect={() => selectProfile(name)}
-              />
-            ))}
-          </div>
         )}
       </ControlBlock>
 
       <ControlBlock
         title="Fan Control"
         gate={fanGate}
-        hint="Automatic lets the firmware manage the fans. Manual holds a fixed duty cycle."
+        hint="Automatic lets the firmware manage the fans. Manual holds a fixed duty cycle. A System Mode selection also sets this."
       >
         <div className="fan-mode">
           <button

@@ -121,10 +121,13 @@ if [ ! -f "$DRIVER_DIR/Makefile" ]; then
 fi
 
 # Build in place; this writes only inside the project directory.
-if [ ! -f "$KO" ]; then
-  dim "  Building the module (writes only inside the project)…"
-  ( cd "$DRIVER_DIR" && make ) || { red "  Build failed."; exit 1; }
-fi
+# Always rebuild rather than only-if-missing: kbuild only recompiles the
+# object whose source actually changed, so a rebuild costs nothing when
+# nothing changed, but skipping it silently reloads a stale .ko after any
+# source edit — which is exactly what happened for three straight
+# diagnostic patches to this file before this fix.
+dim "  Building the module (writes only inside the project)…"
+( cd "$DRIVER_DIR" && make ) || { red "  Build failed."; exit 1; }
 green "  Module built: $KO"
 
 if module_loaded linuwu_sense; then

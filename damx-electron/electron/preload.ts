@@ -45,6 +45,10 @@ const api = {
   setThermalProfile: (profile: string) => call<unknown>('setThermalProfile', { profile }),
   setFanSpeed: (cpu: number, gpu: number) => call<unknown>('setFanSpeed', { cpu, gpu }),
 
+  // real mode switching (governor + EPP + fan) — see electron/cpupower.ts
+  getPowerState: () => call<unknown>('getPowerState'),
+  setPowerMode: (mode: string) => call<unknown>('setPowerMode', { mode }),
+
   // toggles
   setBacklightTimeout: (enabled: boolean) => call<unknown>('setBacklightTimeout', { enabled }),
   setBatteryLimiter: (enabled: boolean) => call<unknown>('setBatteryLimiter', { enabled }),
