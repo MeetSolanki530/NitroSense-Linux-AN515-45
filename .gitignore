@@ -1,6 +1,11 @@
 service/__pycache__/
 __pycache__/
 
+# Editor and IDE
+.idea/
+.vscode/
+*.swp
+
 # Build output
 app/node_modules/
 app/dist/
@@ -11,7 +16,7 @@ app/logs/
 # Third-party kernel driver source, fetched by setup (has its own upstream)
 Linuwu-Sense/
 
-# Reference checkouts of other people's drivers, kept for comparison only.
-# docs/reference/README.md explains what each one settled; the code itself has
-# its own upstream and is re-fetchable, so it is not tracked here.
-docs/reference/*/
+# Local working notes and reference checkouts of other drivers, kept on disk
+# for comparison while debugging. Not part of the project, not published.
+docs/
+.claude

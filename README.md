@@ -4,8 +4,44 @@ NitroSense on Windows does fan control, power modes and keyboard lighting.
 On Linux you get none of it. This brings it back.
 
 > ⚠️ **Built and tested on the Acer Nitro AN515-45 only.**
-> Ryzen 7 5800H, RTX 3050 Ti, Zorin OS (GNOME), kernel 7.0.
 > Other Nitro models may work but nothing here is tested on them.
+
+## 💻 Tested on
+
+| | |
+|---|---|
+| Laptop | Acer Nitro AN515-45 |
+| BIOS | V1.14 |
+| CPU | AMD Ryzen 7 5800H (Radeon integrated) |
+| GPU | NVIDIA RTX 3050 Ti (hybrid, display runs off the AMD side) |
+| Kernel | 7.0.0-31-generic |
+| OS | Zorin OS |
+| Desktop | GNOME on Wayland |
+| Kernel driver | linuwu_sense 25.701, patched |
+
+### Will it work on mine?
+
+Check your model first:
+
+```bash
+cat /sys/class/dmi/id/product_name
+```
+
+- **Nitro AN515-45** 👉 should work exactly as described
+- **Another AN515** 👉 likely works, the keyboard lighting may need a quirk
+  entry adding (see `patches/`)
+- **Predator or other Acer** 👉 untested, no idea
+
+Two things decide whether the keyboard lighting works on a given model: the
+driver needs a DMI entry for it, and the Fn key has to report a keycode the
+desktop can see. Both are covered in `patches/` for the AN515-45.
+
+### Needs
+
+- a GNOME based desktop for the NitroSense key shortcut (the rest works
+  anywhere)
+- kernel headers, gcc and make, to build the driver at install time
+- Secure Boot off, or the module signed yourself, since it is out of tree
 
 ![app icon](app/build/icons/128x128.png)
 
@@ -110,14 +146,13 @@ forcing flags that break the Fn keys.
 Six effects, which is all the firmware actually has: static, breathing, neon,
 wave, shifting, zoom.
 
-## 📄 Third party components
+## 📄 Licence
 
-This ships two GPL licensed pieces that are not mine, kept under their own
-licence:
+The app and the packaging are MIT. See `LICENSE`.
 
-- **Linuwu-Sense**, the kernel driver, patched for this model. See `patches/`
-  for exactly what changed and why.
-- The Python hardware service, used unmodified.
+Two pieces it builds on keep their own licences, because they are not mine to
+relicense:
 
-Everything else, the app and the packaging, is mine. GPL-3.0, same as the parts
-it builds on.
+- the `linuwu_sense` kernel driver, GPL-2.0, patched for this model
+  (see `patches/` for what changed)
+- the Python hardware service, GPL-3.0
