@@ -12,8 +12,20 @@
 #
 # Everything it does is undone by --undo, and by a reboot regardless.
 #
-#   sudo ./scripts/try-driver.sh          load temporarily
-#   sudo ./scripts/try-driver.sh --undo   unload and restore acer_wmi
+#   sudo ./scripts/try-driver.sh               load with nitro_v4=1
+#   sudo ./scripts/try-driver.sh --enable-all  load with enable_all=1
+#   sudo ./scripts/try-driver.sh --undo        unload and restore acer_wmi
+#
+# WHY --enable-all EXISTS
+#   The driver only creates the four_zoned_kb sysfs group when
+#       quirks->four_zone_kb || enable_all
+#   (linuwu_sense.c:4535). On models whose quirk entry has four_zone_kb = 0 —
+#   AN515-45 among them — nitro_v4 leaves keyboard RGB completely unexposed
+#   even where the hardware has it. enable_all forces the quirk on
+#   (linuwu_sense.c:489 and :1000) and the node appears.
+#
+#   It also forces the predator_v4 and nitro_sense quirks, so it is a broader
+#   change than nitro_v4; if something else misbehaves, go back to nitro_v4.
 #
 set -euo pipefail
 
@@ -66,6 +78,15 @@ undo() {
 
 [ "${1:-}" = "--undo" ] && undo
 
+# Which parameter to insert with.
+if [ "${1:-}" = "--enable-all" ]; then
+  MOD_PARAM="enable_all=1"
+  PARAM_NOTE="enable_all (exposes keyboard RGB where the model quirk does not)"
+else
+  MOD_PARAM="nitro_v4=1"
+  PARAM_NOTE="nitro_v4 (AN515-series)"
+fi
+
 head_ "Temporary driver load (nothing persistent is written)"
 
 if [ ! -f "$DRIVER_DIR/Makefile" ]; then
@@ -117,8 +138,17 @@ if [ -d "$ATTR_DIR" ]; then
     ls "$ATTR_DIR/$MODEL" 2>/dev/null | sed 's/^/    /'
   fi
   if [ -d "$ATTR_DIR/four_zoned_kb" ]; then
-    echo "  keyboard:"
+    green "  keyboard RGB: available"
     ls "$ATTR_DIR/four_zoned_kb" 2>/dev/null | sed 's/^/    /'
+  else
+    warn "  keyboard RGB: no four_zoned_kb node"
+    if [ "$MOD_PARAM" != "enable_all=1" ]; then
+      dim "    This model's quirk has four_zone_kb = 0, so nitro_v4 never creates it."
+      dim "    Try:  sudo $0 --enable-all"
+    else
+      dim "    enable_all was used and the node still did not appear, so the"
+      dim "    controller is genuinely absent on this machine."
+    fi
   fi
 else
   warn "  acer-wmi attribute directory not found. Check: dmesg | tail -30"

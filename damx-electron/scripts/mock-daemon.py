@@ -28,12 +28,17 @@ args = [a for a in sys.argv[1:] if not a.startswith("--")]
 flags = {a for a in sys.argv[1:] if a.startswith("--")}
 SOCK = args[0] if args else "/tmp/damx-mock.sock"
 
+NO_RGB = "--no-rgb" in flags   # this AN515-45: nitro_v4 set, no RGB controller
+
 BASE_FEATURES = ["thermal_profile"]
 FORCED_FEATURES = [
     "thermal_profile", "backlight_timeout", "battery_calibration",
     "battery_limiter", "boot_animation_sound", "fan_speed",
     "lcd_override", "usb_charging", "four_zone_mode", "per_zone_mode",
 ]
+if NO_RGB:
+    FORCED_FEATURES = [f for f in FORCED_FEATURES
+                       if f not in ("four_zone_mode", "per_zone_mode")]
 
 DISRUPTIVE = {
     "force_nitro_model", "force_predator_model", "force_enable_all",
@@ -87,11 +92,11 @@ def settings():
     f = features()
     s = {
         "laptop_type": "NITRO" if state["param"] else "UNKNOWN",
-        "has_four_zone_kb": "four_zone_mode" in f,
+        "has_four_zone_kb": (not NO_RGB) and "four_zone_mode" in f,
         "available_features": f,
         "version": "1.0.0-mock",
         "driver_version": "0.0.9",
-        "modprobe_parameter": state["param"] if state["persistent"] else "",
+        "modprobe_parameter": state["param"] if (state["persistent"] or NO_RGB) else "",
         "thermal_profile": {"current": state["profile"], "available": PROFILES},
     }
     if "fan_speed" in f:

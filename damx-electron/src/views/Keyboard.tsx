@@ -259,12 +259,65 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
       </ControlBlock>
 
       {!has('per_zone_mode') && !has('four_zone_mode') && connected && (
-        <p className="control-hint dim">
-          Neither keyboard lighting mode is reported by the driver. On AN515-series
-          hardware this is often resolved by forcing <code>nitro_v4</code> from the
-          Internals tab.
-        </p>
+        <NoLightingNote
+          hasFourZoneKb={Boolean(settings?.has_four_zone_kb)}
+          parameter={String(settings?.modprobe_parameter ?? '')}
+        />
       )}
     </div>
+  );
+}
+
+/**
+ * Why no lighting controls are available.
+ *
+ * The driver only creates its four_zoned_kb sysfs group when
+ *     quirks->four_zone_kb || enable_all
+ * (linuwu_sense.c:4535). Models whose quirk entry sets four_zone_kb = 0 —
+ * AN515-45 among them — therefore expose no RGB interface under nitro_v4 even
+ * when the hardware has one. enable_all forces that quirk on, so an absent
+ * node is only evidence of absent hardware once enable_all has been tried.
+ */
+function NoLightingNote({
+  hasFourZoneKb, parameter,
+}: { hasFourZoneKb: boolean; parameter: string }): JSX.Element {
+  const triedEnableAll = parameter === 'enable_all';
+
+  return (
+    <section className="panel no-lighting">
+      <h2 className="panel-title">Keyboard lighting unavailable</h2>
+      {triedEnableAll ? (
+        <>
+          <p>
+            The driver was loaded with <code>enable_all</code>, which forces the
+            zoned-keyboard node on regardless of the model quirk, and it still did not
+            appear. That points at the controller genuinely being absent on this
+            machine rather than a driver configuration.
+          </p>
+          <p className="dim">
+            Backlight brightness, if the keyboard has it, stays on the Fn keys.
+          </p>
+        </>
+      ) : (
+        <>
+          <p>
+            Neither lighting mode is reported by the driver
+            {parameter !== '' && <> with <code>{parameter}</code> applied</>}.
+          </p>
+          <p>
+            The driver only creates the keyboard-RGB node when the model&rsquo;s quirk
+            entry enables it, or when loaded with <code>enable_all</code>. On
+            AN515-series hardware that quirk is often <code>0</code>, so the controls
+            stay hidden even where the keyboard supports them.
+          </p>
+          <p className="dim">
+            Try <code>enable_all</code> from the Internals tab, or reload the driver
+            with <code>sudo ./scripts/try-driver.sh --enable-all</code>. It also forces
+            the predator quirks, so revert to <code>nitro_v4</code> if anything else
+            misbehaves.
+          </p>
+        </>
+      )}
+    </section>
   );
 }
