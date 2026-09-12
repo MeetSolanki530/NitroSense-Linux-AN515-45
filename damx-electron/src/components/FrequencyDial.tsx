@@ -29,7 +29,7 @@ export function FrequencyDial({
   caption = 'Frequency',
   unit = 'MHz',
   max = 2600,
-  size = 238,
+  size = 254,
 }: Props): JSX.Element {
   const cx = size / 2;
   const cy = size / 2;

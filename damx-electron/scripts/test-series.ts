@@ -2,7 +2,7 @@
  * Chart series tests — the gap and alignment rules that keep the Monitoring
  * charts from lying about the hardware.
  */
-import { buildSegments, latestReading } from '../src/components/series.ts';
+import { autoRange, buildSegments, latestReading } from '../src/components/series.ts';
 
 let passed = 0;
 let failed = 0;
@@ -51,6 +51,37 @@ check('finds the last real value', latestReading([1, 2, 3]) === 3);
 check('skips trailing nulls', latestReading([1, 2, null, null]) === 2);
 check('all-null returns null', latestReading([null, null]) === null);
 check('empty returns null', latestReading([]) === null);
+
+console.log('\n5. Auto-scaled range (clustered temperature readings)');
+{
+  // Real-world case that motivated this: CPU/GPU/iGPU/System all sitting
+  // between 47-52 on a 0-100 scale, indistinguishable near the top.
+  const clustered = autoRange([[47, 48], [51, 52], [48], [51]], 100);
+  check('range is tighter than the full 0-100 scale',
+    clustered.max - clustered.min < 100, JSON.stringify(clustered));
+  check('range contains every reading',
+    clustered.min <= 47 && clustered.max >= 52, JSON.stringify(clustered));
+
+  const noData = autoRange([[], [null, null]], 100);
+  check('no data falls back to [0, fallbackMax]',
+    noData.min === 0 && noData.max === 100, JSON.stringify(noData));
+
+  const flat = autoRange([[50, 50, 50]], 100);
+  check('a perfectly flat series still gets a visible span',
+    flat.max - flat.min >= 10, JSON.stringify(flat));
+
+  const nearZero = autoRange([[1, 2]], 100);
+  check('range never goes negative for low readings',
+    nearZero.min >= 0, JSON.stringify(nearZero));
+
+  const nearMax = autoRange([[98, 99]], 100);
+  check('range never exceeds fallbackMax for high readings',
+    nearMax.max <= 100, JSON.stringify(nearMax));
+
+  const wide = autoRange([[10, 90]], 100);
+  check('a genuinely wide spread is not artificially narrowed',
+    wide.min <= 10 && wide.max >= 90, JSON.stringify(wide));
+}
 
 console.log(`\n${failed === 0 ? '\x1b[32m' : '\x1b[31m'}${passed} passed, ${failed} failed\x1b[0m\n`);
 process.exit(failed === 0 ? 0 : 1);

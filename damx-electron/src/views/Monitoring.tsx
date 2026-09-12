@@ -36,6 +36,11 @@ export function Monitoring({ telemetry }: Props): JSX.Element {
         <TrendChart
           max={100}
           unit="°C"
+          // Idle-machine temperatures cluster in a narrow band (e.g. 45-55°C)
+          // near the top of a fixed 0-100 scale, making four lines nearly
+          // indistinguishable. Utilisation stays fixed: 0-100% is itself the
+          // meaningful range there.
+          autoScale
           series={[
             { label: 'CPU', colour: 'var(--red-bright)', points: cpuTemp },
             { label: 'GPU', colour: 'var(--accent-bright)', points: gpuTemp },

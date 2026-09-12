@@ -14,7 +14,7 @@ type Props = {
 };
 
 export function Sparkline({
-  history, label, value, width = 132, height = 46, max = 100,
+  history, label, value, width = 140, height = 54, max = 100,
 }: Props): JSX.Element {
   const pts = history.length > 1 ? history : [];
   const step = pts.length > 1 ? width / (pts.length - 1) : width;

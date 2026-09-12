@@ -9,7 +9,9 @@
 
 .home-main {
   display: grid;
-  grid-template-columns: 290px minmax(0, 1fr) 210px;
+  /* Right column was noticeably narrower than left, cramping the temperature
+     gauges; widened to match. Left column grown to fit the larger dial. */
+  grid-template-columns: 312px minmax(0, 1fr) 250px;
   gap: 18px;
   align-items: stretch;
   min-height: 0;
@@ -20,8 +22,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 30px;
+  /* space-evenly spreads the dial and the sparkline row across the full
+     panel height instead of clumping both in the middle, which left a
+     single large dead zone below them when the panel was much taller than
+     its content. */
+  justify-content: space-evenly;
+  gap: 24px;
   padding: 28px 20px;
 }
 
@@ -69,6 +75,25 @@
   margin-top: 6px;
 }
 .sparkline-value { font-size: 18px; font-weight: 700; color: var(--text); }
+
+.home-left-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  width: 100%;
+  max-width: 240px;
+}
+.left-foot-item {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
 
 /* ---------- centre ---------- */
 .home-centre {

@@ -26,7 +26,7 @@ export function ArcGauge({
   unit = '°C',
   min = 0,
   max = 100,
-  size = 148,
+  size = 168,
 }: Props): JSX.Element {
   const cx = size / 2;
   const cy = size / 2;

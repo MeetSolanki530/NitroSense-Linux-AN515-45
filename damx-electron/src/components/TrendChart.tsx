@@ -6,7 +6,7 @@
  * read as "the GPU cooled to 0 degrees".
  */
 import type { JSX } from 'react';
-import { buildSegments, latestReading } from './series';
+import { autoRange, buildSegments, latestReading } from './series';
 
 export type Series = {
   label: string;
@@ -19,12 +19,27 @@ type Props = {
   max: number;
   unit: string;
   height?: number;
+  /**
+   * When true, the y-axis tracks the actual data range (with padding)
+   * instead of a fixed [0, max]. Meant for readings whose useful range is
+   * much narrower than their theoretical one — e.g. temperatures that sit
+   * at 45-55°C on a 0-100° scale render as four indistinguishable flat
+   * lines pinned near the top; auto-scaling spreads them out. Leave this
+   * off for values where 0-100 is itself meaningful, like a percentage.
+   */
+  autoScale?: boolean;
 };
 
-export function TrendChart({ series, max, unit, height = 150 }: Props): JSX.Element {
+export function TrendChart({
+  series, max: fallbackMax, unit, height = 150, autoScale = false,
+}: Props): JSX.Element {
   const width = 600; // viewBox units; the SVG scales to its container
   // All series share one time axis anchored at the right edge.
   const longest = Math.max(1, ...series.map((s) => s.points.length));
+
+  const { min, max } = autoScale
+    ? autoRange(series.map((s) => s.points), fallbackMax)
+    : { min: 0, max: fallbackMax };
 
   const gridLines = [0, 0.25, 0.5, 0.75, 1];
 
@@ -49,7 +64,7 @@ export function TrendChart({ series, max, unit, height = 150 }: Props): JSX.Elem
         ))}
 
         {series.map((s) =>
-          buildSegments(s.points, { width, height, max, capacity: longest }).map((pts, i) => (
+          buildSegments(s.points, { width, height, max, min, capacity: longest }).map((pts, i) => (
             <polyline
               key={`${s.label}-${i}`}
               points={pts}
@@ -67,7 +82,7 @@ export function TrendChart({ series, max, unit, height = 150 }: Props): JSX.Elem
 
       <div className="trend-axis">
         <span>{max}{unit}</span>
-        <span>0{unit}</span>
+        <span>{min}{unit}</span>
       </div>
 
       <div className="trend-legend">

@@ -54,6 +54,22 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
             <Sparkline history={gpuHistory} label="GPU Usage" value={gpuUsage} />
             <Sparkline history={cpuHistory} label="CPU Usage" value={cpuUsage} />
           </div>
+          {/* Real telemetry already fetched for the aside/Monitoring views,
+              surfaced here too rather than left blank — the GPU model in
+              particular has nowhere else to live on this screen. */}
+          <div className="home-left-foot">
+            {gpu?.name && (
+              <span className="left-foot-item" title={gpu.name}>{gpu.name}</span>
+            )}
+            <span className="left-foot-item mono-num">
+              Fan{' '}
+              {telemetry?.fans.cpuRpm === null || telemetry === null ? (
+                <span className="dim">--</span>
+              ) : (
+                `${telemetry.fans.cpuRpm} RPM`
+              )}
+            </span>
+          </div>
         </section>
 
         {/* ---- centre: identity + mode ---- */}
