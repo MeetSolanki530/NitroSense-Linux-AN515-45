@@ -284,6 +284,58 @@ few or no features, because it has nothing to control. That is itself a useful
 test: the app should connect and show each control as unavailable with a
 reason, rather than pretending it works.
 
+## Developing
+
+```bash
+npm run dev
+```
+
+Starts the Vite dev server and Electron together. Renderer edits hot-reload
+instantly; `electron/` edits rebuild and restart Electron automatically.
+Ctrl-C stops both. No extra dependencies — `scripts/dev.mjs` does this in
+plain Node.
+
+`npm start` instead does a production build and runs it, which is what to use
+when checking real behaviour rather than iterating on UI.
+
+Both clear `ELECTRON_RUN_AS_NODE`, which VS Code sets for its extension host;
+with it set, Electron runs as plain Node and `require('electron')` returns a
+path string instead of the API, so the app fails at startup.
+
+For a full session you need three things running:
+
+| | |
+|---|---|
+| driver | `sudo ./scripts/try-driver.sh` (once per boot) |
+| daemon | `sudo ./scripts/run-daemon-dev.sh` (foreground, own terminal) |
+| app | `npm run dev` |
+
+Without the daemon the app still runs and shows live telemetry, since that
+comes from sysfs — only the hardware controls go dark.
+
+### Testing without hardware
+
+`scripts/mock-daemon.py` implements the protocol, so most work needs no
+laptop:
+
+```bash
+python3 scripts/mock-daemon.py /tmp/damx-mock.sock --start-forced &
+DAMX_SOCKET=/tmp/damx-mock.sock npm run dev
+```
+
+Useful flags: `--start-forced` (features already unlocked), `--eio-profile`
+(reproduces this AN515-45: five profiles with an unreadable current value and
+`-1` for the unsupported toggles), `--break-on-restart` (a driver reload that
+returns no features).
+
+```bash
+npm test           # 162 unit assertions
+npm run test:e2e   # 36 end-to-end, drives the real app against the mock
+npm run typecheck
+./scripts/smoke.sh out.png            # render headlessly and capture
+./scripts/smoke.sh out.png            # add --smoke-tab=<id> via electron args
+```
+
 ## Trying the driver without changing anything
 
 Preferred for a first test. Loads the driver into memory only — no persistent
