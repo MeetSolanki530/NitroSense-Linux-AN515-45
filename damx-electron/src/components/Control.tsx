@@ -9,6 +9,11 @@ import type { JSX, ReactNode } from 'react';
 
 export type Gate = { ok: true } | { ok: false; reason: string };
 
+/** For blocks that group several features; each control gates individually. */
+export function connectionGate(connected: boolean): Gate {
+  return connected ? { ok: true } : { ok: false, reason: 'Daemon offline' };
+}
+
 export function gateFor(
   feature: string,
   has: (f: string) => boolean,

@@ -148,14 +148,34 @@ bug. Fan `0/0` means automatic; switching to Manual does not write until a
 slider actually moves.
 
 ```bash
-npm test          # validation, telemetry, formatting  (68 assertions)
-npm run test:e2e  # real writes through the full chain (13 assertions)
+npm test          # validation, telemetry, formatting  (94 assertions)
+npm run test:e2e  # real writes through the full chain (19 assertions)
 ```
 
 The e2e suite launches the actual Electron app against the mock daemon and
 drives writes from the renderer, asserting against the daemon's state rather
 than the UI's optimism. It also asserts the renderer has no `require`, no
 `process`, and no generic `send()`.
+
+## Step 7 — battery, USB charging, display & boot (done)
+
+The remaining daemon toggles: battery limiter, battery calibration, USB
+charging level, LCD override, boot animation/sound, keyboard backlight
+timeout.
+
+The governing rule is in `src/state/format.ts`: the daemon returns these as
+sysfs strings, and a value that cannot be read renders **"unknown", never
+"off"**. A toggle showing off for a feature it cannot read misrepresents the
+hardware.
+
+**Battery calibration is treated differently** from the cosmetic toggles. It
+runs a full discharge/recharge cycle lasting hours that cannot usefully be
+interrupted, so it requires an explicit acknowledgement before the switch
+becomes operable — the others fire on a single click.
+
+USB charging offers exactly the four levels the daemon accepts (Off/10/20/30);
+an off-grid value read back from the driver shows as unreadable rather than
+being silently rounded.
 
 ## Protocol notes
 

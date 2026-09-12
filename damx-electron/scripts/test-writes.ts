@@ -22,7 +22,7 @@ function check(name: string, cond: boolean, detail = ''): void {
 function runInRenderer(code: string): Promise<unknown> {
   const encoded = Buffer.from(code, 'utf8').toString('base64');
   return new Promise((resolve, reject) => {
-    const env = { ...process.env, DAMX_SOCKET: SOCK };
+    const env: NodeJS.ProcessEnv = { ...process.env, DAMX_SOCKET: SOCK };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.ELECTRON_NO_ATTACH_CONSOLE;
     execFile(
@@ -98,8 +98,37 @@ async function main(): Promise<void> {
     check('0/0 returns the fans to automatic', r3.auto.cpu === '0' && r3.auto.gpu === '0',
       JSON.stringify(r3.auto));
 
-    console.log('\n4. Unknown methods are unreachable from the renderer');
-    const r4 = (await runInRenderer(`
+    console.log('\n4. Toggles round-trip through the daemon');
+    const r5 = (await runInRenderer(`
+      (async () => {
+        await window.damx.setBatteryLimiter(false);
+        const off = await window.damx.getSettings();
+        await window.damx.setBatteryLimiter(true);
+        const on = await window.damx.getSettings();
+        await window.damx.setLcdOverride(true);
+        await window.damx.setBootAnimationSound(false);
+        await window.damx.setBacklightTimeout(true);
+        await window.damx.setUsbCharging(30);
+        const final = await window.damx.getSettings();
+        return {
+          limiterOff: off.battery_limiter,
+          limiterOn: on.battery_limiter,
+          lcd: final.lcd_override,
+          boot: final.boot_animation_sound,
+          backlight: final.backlight_timeout,
+          usb: final.usb_charging,
+        };
+      })()
+    `)) as Record<string, string>;
+    check('limiter turns off', r5.limiterOff === '0', r5.limiterOff);
+    check('limiter turns back on', r5.limiterOn === '1', r5.limiterOn);
+    check('lcd override set', r5.lcd === '1', r5.lcd);
+    check('boot animation cleared', r5.boot === '0', r5.boot);
+    check('backlight timeout set', r5.backlight === '1', r5.backlight);
+    check('usb charging set to 30', r5.usb === '30', r5.usb);
+
+    console.log('\n5. Unknown methods are unreachable from the renderer');
+    const r6 = (await runInRenderer(`
       (async () => ({
         keys: Object.keys(window.damx).length,
         hasRawSend: typeof window.damx.send,
@@ -108,10 +137,10 @@ async function main(): Promise<void> {
         hasProcess: typeof window.process,
       }))()
     `)) as Record<string, unknown>;
-    check('no generic send() is exposed', r4.hasRawSend === 'undefined');
-    check('no generic invoke() is exposed', r4.hasInvoke === 'undefined');
-    check('renderer has no require()', r4.hasRequire === 'undefined');
-    check('renderer has no process', r4.hasProcess === 'undefined');
+    check('no generic send() is exposed', r6.hasRawSend === 'undefined');
+    check('no generic invoke() is exposed', r6.hasInvoke === 'undefined');
+    check('renderer has no require()', r6.hasRequire === 'undefined');
+    check('renderer has no process', r6.hasProcess === 'undefined');
   } finally {
     mock.kill();
   }

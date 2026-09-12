@@ -4,6 +4,7 @@ import type { Tab } from './components/TitleBar';
 import { Placeholder } from './views/Placeholder';
 import { Home } from './views/Home';
 import { Performance } from './views/Performance';
+import { Battery } from './views/Battery';
 import { useConnection, useSettings, useTelemetry } from './state/damx';
 import './components/TitleBar.css';
 import './App.css';
@@ -66,9 +67,8 @@ export function App(): JSX.Element {
             connection={connection} refresh={refresh} />
         )}
         {active === 'battery' && (
-          <Placeholder title="Battery & Power" step="step 7" has={has}
-            requires={['battery_limiter', 'battery_calibration', 'usb_charging', 'lcd_override',
-              'boot_animation_sound', 'backlight_timeout']} />
+          <Battery settings={settings} telemetry={telemetry} has={has}
+            connection={connection} refresh={refresh} />
         )}
         {active === 'keyboard' && (
           <Placeholder title="Keyboard Lighting" step="step 8" has={has}
