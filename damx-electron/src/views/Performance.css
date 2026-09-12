@@ -155,4 +155,12 @@
   border: 1px solid rgba(255, 166, 30, 0.35);
   border-radius: var(--radius);
 }
-.profile-warning code { font-family: var(--font-display); color: #fff; }
+.profile-warning code {
+  font-family: var(--font-display);
+  color: #fff;
+  /* Inline code sat flush against the surrounding words. */
+  margin: 0 2px;
+  padding: 1px 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+}

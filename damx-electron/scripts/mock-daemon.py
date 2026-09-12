@@ -59,20 +59,21 @@ state = {
     "param": "nitro_v4" if "--start-forced" in flags else "",
     "persistent": False,
     "broken": False,
-    "profile": "balanced",
+    "profile": "" if "--eio-profile" in flags else "balanced",
     "fan_cpu": 0,
     "fan_gpu": 0,
     "toggles": {
-        "backlight_timeout": "0", "battery_calibration": "0",
-        "battery_limiter": "1", "boot_animation_sound": "1",
-        "lcd_override": "0",
+        "backlight_timeout": "-1" if "--eio-profile" in flags else "0", "battery_calibration": "0",
+        "battery_limiter": "1",
+        "boot_animation_sound": "-1" if "--eio-profile" in flags else "1",
+        "lcd_override": "-1" if "--eio-profile" in flags else "0",
     },
     "usb_charging": "10",
     "per_zone": "ff0000,00ff00,0000ff,ffffff,100",
     "four_zone": "0,0,100,1,255,106,0",
 }
 
-PROFILES = ["low-power", "balanced", "performance"]
+PROFILES = ["low-power", "quiet", "balanced", "balanced-performance", "performance"]
 lock = threading.Lock()
 
 
