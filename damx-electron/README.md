@@ -29,6 +29,7 @@ node scripts/probe.ts
 python3 scripts/mock-daemon.py /tmp/damx-mock.sock &
 DAMX_SOCKET=/tmp/damx-mock.sock node scripts/test-client.ts     # 11 assertions
 DAMX_SOCKET=/tmp/damx-mock.sock node scripts/test-internals.ts  # 17 assertions
+node scripts/test-telemetry.ts                                  # 16 assertions
 ```
 
 The mock is stateful: it starts in the unforced AN515-45-like state (thin
@@ -70,6 +71,37 @@ If the daemon never returns, recover with:
 ```bash
 sudo modprobe linuwu_sense && sudo systemctl restart damx-daemon.service
 ```
+
+## Step 3 — telemetry (done)
+
+- `electron/telemetry.ts` — sensor discovery and polling.
+- `scripts/monitor.ts` — live readout of everything the Home screen binds to.
+
+```bash
+node scripts/monitor.ts     # no daemon or root needed
+```
+
+The daemon provides **no telemetry** — `get_all_settings` returns settings
+only. Every number on the dashboard is gathered here. Three deliberate
+differences from the Avalonia app:
+
+1. **Sensors are found by name**, never by hwmon index. Indices are not stable
+   across reboots.
+2. **Discovery is re-runnable.** Loading `linuwu_sense` adds hwmon devices —
+   that is where fan RPM comes from — so a cache built once at startup goes
+   stale the moment the Internals Manager reloads the driver. Call
+   `rediscover()` after any driver operation; the poller also re-scans
+   periodically.
+3. **`nvidia-smi` is gated on the dGPU's `power/runtime_status`.** Polling it
+   unconditionally keeps the discrete GPU awake, costing battery and idle
+   heat. When suspended, the poller reports `idle` and shows `--`, reproducing
+   the "Discrete GPU is idle" state without resuming the card.
+
+Missing readings are reported as `null` and render as `--`. Nothing fabricates
+a zero.
+
+On this machine: `k10temp` → CPU, `acpitz` → System, `amdgpu` → iGPU,
+`nvidia-smi` → RTX 3050 Ti. Fan RPM is unavailable until `linuwu_sense` loads.
 
 ## Protocol notes
 
