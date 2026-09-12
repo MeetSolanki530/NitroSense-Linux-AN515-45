@@ -36,6 +36,65 @@ function windowIcon(): string | null {
   return existsSync(p) ? p : null;
 }
 
+let splash: BrowserWindow | null = null;
+let splashShownAt = 0;
+/** Long enough to read, short enough not to be in the way. */
+const SPLASH_MIN_MS = 1_100;
+
+/**
+ * Branded window shown while the main window loads.
+ *
+ * This exists because of how the app is launched: the Nitro key starts a cold
+ * Electron process, and the gap before the first paint is dead time with no
+ * feedback at all — the key looks like it did nothing. A frameless window with
+ * the mark covers that gap.
+ *
+ * Skipped in smoke/eval runs, which must not have an extra window competing
+ * for focus or capture.
+ */
+function createSplash(): void {
+  if (process.argv.some((a) => a.startsWith('--smoke-'))) return;
+
+  const file = join(APP_DIR, '../dist/splash.html');
+  if (!existsSync(file)) return;
+
+  splash = new BrowserWindow({
+    width: 420,
+    height: 260,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    center: true,
+    backgroundColor: '#00000000',
+    ...(windowIcon() ? { icon: windowIcon() as string } : {}),
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+
+  splash.once('ready-to-show', () => {
+    splashShownAt = Date.now();
+    splash?.show();
+  });
+  splash.on('closed', () => { splash = null; });
+  void splash.loadFile(file);
+}
+
+function closeSplash(): void {
+  if (!splash) return;
+  splash.close();
+  splash = null;
+}
+
+/** How long the splash still owes the user before it may close. */
+function splashRemainingMs(): number {
+  if (!splash) return 0;
+  if (splashShownAt === 0) return SPLASH_MIN_MS;
+  return Math.max(0, SPLASH_MIN_MS - (Date.now() - splashShownAt));
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -59,7 +118,23 @@ function createWindow(): BrowserWindow {
     },
   });
 
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => {
+    // Hand over from the splash rather than stacking both windows: wait out
+    // whatever the splash still owes, then swap in one step.
+    setTimeout(() => {
+      win.show();
+      win.focus();
+      closeSplash();
+    }, splashRemainingMs());
+  });
+
+  // Safety net: if the page never becomes ready (daemon wedged, load error),
+  // the splash must not sit on top of everything forever.
+  setTimeout(() => {
+    if (!splash) return;
+    closeSplash();
+    if (!win.isDestroyed() && !win.isVisible()) win.show();
+  }, 15_000);
 
   // Smoke mode: render, capture, exit. Used by scripts/smoke.sh to verify the
   // shell actually paints and that telemetry reaches the renderer, without a
@@ -136,6 +211,11 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', focusExisting);
 
   void app.whenReady().then(async () => {
+    // First, before any I/O: the Nitro key gives no feedback of its own, so
+    // something must appear immediately or the key looks dead. Everything
+    // below (socket connect, telemetry start) happens behind it.
+    createSplash();
+
     const client = new DamxClient();
     const internals = new InternalsManager(client);
     const telemetry = new TelemetryPoller({ intervalMs: 1_000 });

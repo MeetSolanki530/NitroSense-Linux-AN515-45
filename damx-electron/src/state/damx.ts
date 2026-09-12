@@ -141,13 +141,22 @@ export type PowerStateHook = { state: PowerState | null; refresh: () => Promise<
  * disconnected. Shared between Home (mode summary) and Performance (mode
  * switching) so both stay consistent with each other.
  */
-export function usePowerState(pollMs = 5_000): PowerStateHook {
+export function usePowerState(pollMs = 2_000): PowerStateHook {
   const [state, setState] = useState<PowerState | null>(null);
+  const inFlight = useRef(false);
   const refresh = useCallback(async () => {
+    // Governor/EPP are plain sysfs reads, but a pkexec prompt can hold one
+    // open for as long as the password dialog is up. Skipping a tick while
+    // that is pending is correct here: unlike settings, this hook is not the
+    // reconciliation path for a write (Performance re-reads explicitly).
+    if (inFlight.current) return;
+    inFlight.current = true;
     try {
       setState(await window.damx.getPowerState());
     } catch {
       // Leave the last-known state rather than blank it on a transient error.
+    } finally {
+      inFlight.current = false;
     }
   }, []);
   useEffect(() => {
@@ -166,23 +175,52 @@ export type SettingsHook = {
   has: (feature: string) => boolean;
 };
 
-export function useSettings(pollMs = 5_000): SettingsHook {
+export function useSettings(pollMs = 2_000): SettingsHook {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const inFlight = useRef(false);
+  const current = useRef<Promise<void> | null>(null);
+  const queued = useRef<Promise<void> | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (inFlight.current) return;
-    inFlight.current = true;
+  const readOnce = useCallback(async () => {
     try {
       setSettings(await window.damx.getSettings());
       setError(null);
     } catch (e) {
       setError((e as Error).message);
-    } finally {
-      inFlight.current = false;
     }
   }, []);
+
+  /**
+   * Coalescing read.
+   *
+   * This used to drop the request outright when one was already in flight,
+   * which quietly broke the thing that makes writes feel immediate: run()
+   * calls refresh() right after a write, and if a background poll happened to
+   * be running at that moment the reconciliation never happened and the UI sat
+   * on stale values until the next poll.
+   *
+   * Callers arriving during a read now share ONE follow-up read instead, so a
+   * write is always reconciled while a burst still cannot queue a read each.
+   */
+  const refresh = useCallback((): Promise<void> => {
+    if (!current.current) {
+      const p = readOnce().finally(() => {
+        if (current.current === p) current.current = null;
+      });
+      current.current = p;
+      return p;
+    }
+    if (!queued.current) {
+      const q = current.current
+        .catch(() => undefined)
+        .then(() => readOnce())
+        .finally(() => {
+          if (queued.current === q) queued.current = null;
+        });
+      queued.current = q;
+    }
+    return queued.current;
+  }, [readOnce]);
 
   useEffect(() => {
     void refresh();

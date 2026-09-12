@@ -16,7 +16,7 @@
  * entirely — it still works with the daemon offline, since it never touches
  * the socket for the CPU side.
  */
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { ControlBlock, Slider, gateFor, type Gate } from '../components/Control';
 import { ModeTile } from '../components/ModeTile';
 import { useCommand, useDebounced, useOptimistic } from '../state/useCommand';
@@ -77,9 +77,17 @@ export function Performance({
   // daemon is disconnected.
   const { state: powerState, refresh: reloadPowerState } = usePowerState();
 
+  // A mode change writes two different things: the CPU governor/EPP, and the
+  // daemon's fan speeds. Reconciling only the power state left the fan
+  // controls showing stale values until the next settings poll seconds later,
+  // which read as the mode "not taking effect". Re-read both.
+  const reloadAfterMode = useCallback(async (): Promise<void> => {
+    await Promise.all([reloadPowerState(), refresh()]);
+  }, [reloadPowerState, refresh]);
+
   const {
     run: runMode, busy: modeBusy, error: modeError, clearError: clearModeError,
-  } = useCommand(reloadPowerState);
+  } = useCommand(reloadAfterMode);
 
   const gate = powerModeGate(powerState);
   const currentMode = useOptimistic(powerState?.currentMode ?? null);
