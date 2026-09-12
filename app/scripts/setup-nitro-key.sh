@@ -61,12 +61,20 @@ detect() {
 command -v gsettings >/dev/null || { red "gsettings not found; this needs a GNOME-based session."; exit 1; }
 
 # Find an existing entry for us, or the first free slot.
+#
+# The old name is matched too. The name is a lookup key, not decoration: it is
+# how an existing shortcut is found, so a rename would orphan one written by an
+# earlier version and leave a duplicate behind instead of updating it.
 list="$(gsettings get "$SCHEMA" custom-keybindings 2>/dev/null || echo "@as []")"
+LEGACY_NAME="Div Acer Manager Max"
 slot=""
 for i in $(seq 0 20); do
   path="$BASE/custom$i/"
   existing="$(gsettings get "$CUSTOM:$path" name 2>/dev/null || echo "''")"
-  if [ "$existing" = "'$NAME'" ]; then slot="$path"; break; fi
+  if [ "$existing" = "'$NAME'" ] || [ "$existing" = "'$LEGACY_NAME'" ]; then
+    slot="$path"
+    break
+  fi
 done
 
 if [ "${1:-}" = "--uninstall" ]; then

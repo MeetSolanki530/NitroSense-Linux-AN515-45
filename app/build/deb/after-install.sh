@@ -74,6 +74,18 @@ install_driver() {
 install_driver || true
 
 # ------------------------------------------------------------------ service
+# An older install of a related tool may have left a service that binds the
+# same socket. Two of them fighting over it is worse than either alone, so
+# stand any down before starting ours.
+for legacy in damx-daemon.service linuwu_sense.service; do
+  if [ -f "/etc/systemd/system/$legacy" ]; then
+    say "standing down a leftover $legacy"
+    systemctl stop "$legacy" 2>/dev/null || true
+    systemctl disable "$legacy" >/dev/null 2>&1 || true
+    rm -f "/etc/systemd/system/$legacy"
+  fi
+done
+
 install -d "$DAEMON_DIR"
 if [ -f "$DAEMON_SRC/nitrosense-daemon.py" ]; then
   install -m 755 "$DAEMON_SRC"/*.py "$DAEMON_DIR/"

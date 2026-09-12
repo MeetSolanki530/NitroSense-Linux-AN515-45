@@ -35,6 +35,21 @@ const BASE = '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings';
 const ENTRY_NAME = 'NitroSense';
 
 /**
+ * Names a shortcut of ours may carry, newest first.
+ *
+ * The name is a lookup key, not decoration: an existing binding is found by
+ * it, and that is what stops the app asking to set the key up again. So a
+ * rename orphans every shortcut written by an earlier version, and the user
+ * gets asked again for a key that already works. Old names stay listed here
+ * for exactly that reason.
+ */
+const KNOWN_ENTRY_NAMES = [ENTRY_NAME, 'Div Acer Manager Max'];
+
+function isOurs(name: string): boolean {
+  return KNOWN_ENTRY_NAMES.some((n) => name.includes(n));
+}
+
+/**
  * What the NitroSense/PredatorSense key can report, as X keysyms.
  *
  * XF86Presentation first because that is what it actually is on AN515-45:
@@ -130,18 +145,30 @@ export class NitroKey {
     return this.#config;
   }
 
-  /** The key currently bound to us, if any. */
+  /**
+   * The key currently bound to us, if any.
+   *
+   * A shortcut written by an earlier version carries the old name. Rather than
+   * leaving that lying around under a name this project no longer uses, it is
+   * renamed in place and its command pointed at the current launcher, so there
+   * is exactly one shortcut and it says NitroSense.
+   */
   async existingBinding(): Promise<string | null> {
     if (!(await available())) return null;
     for (const path of await this.#slots()) {
       try {
         const name = await run('gsettings', ['get', `${CUSTOM}:${path}`, 'name']);
-        if (!name.includes(ENTRY_NAME)) continue;
+        if (!isOurs(name)) continue;
         const binding = await run('gsettings', ['get', `${CUSTOM}:${path}`, 'binding']);
         const value = binding.replace(/^'|'$/g, '');
         // A detection run leaves several temporary bindings; those are not a
         // decision, so ignore them and let setup carry on.
-        if (value && !name.includes('detecting')) return value;
+        if (!value || name.includes('detecting')) continue;
+
+        if (!name.includes(ENTRY_NAME)) {
+          await this.#write(path, ENTRY_NAME, this.#launcher, value);
+        }
+        return value;
       } catch {
         // Unreadable slot: skip rather than guess.
       }
@@ -250,7 +277,7 @@ export class NitroKey {
       } catch {
         // Unreadable slot: leave it alone rather than guess.
       }
-      if (name.includes(ENTRY_NAME)) {
+      if (isOurs(name)) {
         await run('gsettings', ['reset-recursively', `${CUSTOM}:${path}`]).catch(() => undefined);
       } else {
         keep.push(path);
