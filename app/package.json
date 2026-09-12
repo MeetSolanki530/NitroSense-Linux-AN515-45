@@ -10,6 +10,7 @@
   },
   "private": true,
   "type": "module",
+  "desktopName": "nitrosense.desktop",
   "scripts": {
     "probe": "node scripts/probe.ts",
     "build:electron": "node build-electron.mjs",
@@ -88,6 +89,7 @@
       "maintainer": "MeetSolanki530 <solankimeet530@gmail.com>",
       "icon": "build/icons",
       "executableName": "nitrosense",
+      "syncDesktopName": true,
       "desktop": {
         "entry": {
           "Name": "NitroSense",
