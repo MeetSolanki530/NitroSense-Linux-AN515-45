@@ -56,7 +56,13 @@ if [ "$(id -u)" -eq 0 ]; then
 fi
 
 # ---------------------------------------------------------------- cleanup
+# Only tear down what THIS run started. Exiting early (bad option, no sudo)
+# must not touch a daemon someone started from another terminal, and must not
+# call sudo when sudo is why we are exiting.
+DAEMON_STARTED=0
+
 cleanup() {
+  [ "$DAEMON_STARTED" -eq 1 ] || return 0
   echo ""
   step "Shutting down"
   if [ -f "$PIDFILE" ]; then
@@ -67,6 +73,7 @@ cleanup() {
     fi
     sudo rm -f "$PIDFILE"
   fi
+  # Ours to remove, since we started the daemon that created it.
   sudo rm -f "$SOCK" 2>/dev/null || true
   dim "  socket removed"
   dim "  driver left loaded — remove with: sudo ./scripts/try-driver.sh --undo"
@@ -129,18 +136,34 @@ if [ ! -f "$DAEMON_SRC" ]; then
   exit 1
 fi
 
-# Clear a stale socket from a previous run so the new daemon can bind.
-[ -S "$SOCK" ] && sudo rm -f "$SOCK"
+# A daemon may already be running from another terminal. Starting a second one
+# would unlink that daemon's socket and leave it orphaned, so reuse it instead.
+# The script's own command line does not contain the daemon filename, so this
+# pgrep cannot match the script itself.
+EXISTING="$(pgrep -f 'DAMX-Daemon\.py' || true)"
+if [ -n "$EXISTING" ]; then
+  warn "  A daemon is already running (pid $(echo "$EXISTING" | head -1)) — reusing it."
+  dim "  Its log is wherever that terminal was pointed, not logs/daemon.log."
+  if [ ! -S "$SOCK" ]; then
+    red "  But $SOCK does not exist, so it is not serving. Stop it and re-run."
+    exit 1
+  fi
+else
+  # Only remove a socket when no daemon is alive to own it: a leftover file
+  # from an unclean exit would otherwise block the bind.
+  [ -S "$SOCK" ] && sudo rm -f "$SOCK"
 
-sudo bash -c "cd '$(dirname "$DAEMON_SRC")' && python3 '$DAEMON_SRC' --verbose > '$LOG' 2>&1 & echo \$! > '$PIDFILE'"
-# The daemon runs as root, so its log lands root-owned; make it readable.
-sleep 0.5
-sudo chmod 644 "$LOG" 2>/dev/null || true
+  sudo bash -c "cd '$(dirname "$DAEMON_SRC")' && python3 '$DAEMON_SRC' --verbose > '$LOG' 2>&1 & echo \$! > '$PIDFILE'"
+  DAEMON_STARTED=1
+  # The daemon runs as root, so its log lands root-owned; make it readable.
+  sleep 0.5
+  sudo chmod 644 "$LOG" 2>/dev/null || true
 
-for _ in $(seq 1 30); do
-  [ -S "$SOCK" ] && break
-  sleep 0.25
-done
+  for _ in $(seq 1 30); do
+    [ -S "$SOCK" ] && break
+    sleep 0.25
+  done
+fi
 
 if [ ! -S "$SOCK" ]; then
   red "  Daemon did not create $SOCK"
@@ -149,13 +172,17 @@ if [ ! -S "$SOCK" ]; then
   exit 1
 fi
 
-green "  Running (pid $(cat "$PIDFILE"))"
-dim "  log: logs/daemon.log   — follow with:  tail -f logs/daemon.log"
+if [ "$DAEMON_STARTED" -eq 1 ]; then
+  green "  Running (pid $(cat "$PIDFILE" 2>/dev/null || echo '?'))"
+  dim "  log: logs/daemon.log   — follow with:  tail -f logs/daemon.log"
 
-# Report what the daemon actually found, so a broken feature is visible here
-# rather than only inside the UI.
-sudo grep -E "Detected laptop type|Four-zone keyboard|Available features" "$LOG" 2>/dev/null \
-  | sed 's/.*INFO - /  /' || true
+  # Report what the daemon actually found, so a missing feature is visible
+  # here rather than only inside the UI.
+  sudo grep -E "Detected laptop type|Four-zone keyboard|Available features" "$LOG" 2>/dev/null \
+    | sed 's/.*INFO - /  /' || true
+else
+  green "  Using the daemon that was already running."
+fi
 
 # ---------------------------------------------------------------- app
 step "3/3  App"
