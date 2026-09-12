@@ -6,10 +6,14 @@
  *
  * How detection works is unusual and worth knowing when reading this: the app
  * cannot listen for the key. /dev/input is root:input, and Electron's
- * globalShortcut has no XF86Launch* accelerators. So main binds every
+ * globalShortcut has no XF86* accelerators for these keys. So main binds every
  * candidate at once, each launching this same app with a marker; pressing the
  * key starts a second process, the single-instance lock forwards its argv, and
  * the marker names the key. See electron/nitro-key.ts.
+ *
+ * Not every model's key reaches the desktop at all — some are handled purely
+ * in firmware — so listening also times out and offers a plain shortcut
+ * instead, rather than waiting on a press that can never arrive.
  *
  * That means the window genuinely does relaunch-and-focus mid-setup, which is
  * why the listening state tells the user the window may flicker.
@@ -18,7 +22,10 @@ import { useEffect, useState, type JSX } from 'react';
 import type { NitroKeyState } from '../state/damx';
 import './NitroKeySetup.css';
 
-type Phase = 'intro' | 'listening' | 'done' | 'failed';
+type Phase = 'intro' | 'listening' | 'notfound' | 'done' | 'failed';
+
+/** Long enough to find the key and press it, short enough not to hang. */
+const LISTEN_TIMEOUT_MS = 25_000;
 
 export function NitroKeySetup(): JSX.Element | null {
   const [state, setState] = useState<NitroKeyState | null>(null);
@@ -46,6 +53,18 @@ export function NitroKeySetup(): JSX.Element | null {
     });
   }, []);
 
+  // Give up listening rather than spinning forever. On models where the key
+  // is handled in firmware it never reaches the desktop at all, so no press
+  // will ever arrive and the only honest move is to offer something else.
+  useEffect(() => {
+    if (phase !== 'listening') return undefined;
+    const id = setTimeout(() => {
+      void window.damx.nitroKeyCancel().catch(() => undefined);
+      setPhase('notfound');
+    }, LISTEN_TIMEOUT_MS);
+    return () => clearTimeout(id);
+  }, [phase]);
+
   // Nothing to ask once the user has answered, and nothing to offer on a
   // desktop with no custom-shortcut store.
   if (!state || state.decided || !state.available) return null;
@@ -55,6 +74,13 @@ export function NitroKeySetup(): JSX.Element | null {
     void window.damx.nitroKeyBegin().then(({ ok }) => {
       if (!ok) setPhase('failed');
     }).catch(() => setPhase('failed'));
+  };
+
+  const useFallback = (): void => {
+    void window.damx
+      .nitroKeyConfirm(state.fallback)
+      .then(() => { setBound(state.fallbackLabel); setPhase('done'); })
+      .catch(() => setPhase('failed'));
   };
 
   const decline = (): void => {
@@ -103,6 +129,24 @@ export function NitroKeySetup(): JSX.Element | null {
             <div className="nks-bar"><i /></div>
             <div className="nks-actions">
               <button type="button" className="nks-ghost" onClick={cancel}>Cancel</button>
+            </div>
+          </>
+        )}
+
+        {phase === 'notfound' && (
+          <>
+            <h2>Did not see that key</h2>
+            <p>
+              Some models handle this key entirely in firmware, so the desktop
+              never sees it and nothing can be bound to it. You can use an
+              ordinary shortcut instead.
+            </p>
+            <div className="nks-actions">
+              <button type="button" className="nks-primary" onClick={useFallback}>
+                Use {state.fallbackLabel}
+              </button>
+              <button type="button" className="nks-ghost" onClick={begin}>Try again</button>
+              <button type="button" className="nks-ghost" onClick={decline}>Skip</button>
             </div>
           </>
         )}

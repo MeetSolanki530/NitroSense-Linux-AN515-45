@@ -11,7 +11,7 @@
 # job with no privileges and no background process.
 #
 #   ./scripts/setup-nitro-key.sh --detect     find which key your Nitro key is
-#   ./scripts/setup-nitro-key.sh              bind it (default XF86Launch1)
+#   ./scripts/setup-nitro-key.sh              bind it (default XF86Presentation)
 #   ./scripts/setup-nitro-key.sh XF86Launch2  bind a specific key
 #   ./scripts/setup-nitro-key.sh --uninstall  remove the binding
 #
@@ -34,18 +34,20 @@ detect() {
   head_ "Detecting the Nitro key"
   command -v evtest >/dev/null || { red "evtest is not installed:  sudo apt install evtest"; exit 1; }
 
+  # The NitroSense key arrives on the real keyboard as KEY_PRESENTATION, not
+  # on the Acer WMI hotkeys device, which reports nothing for it.
   local dev
-  dev="$(grep -B 4 'Handlers=.*event' /proc/bus/input/devices \
-         | grep -A 4 'Acer WMI hotkeys' \
+  dev="$(grep -A 5 -B 5 'AT Translated Set 2 keyboard' /proc/bus/input/devices \
          | grep -oE 'event[0-9]+' | head -1 || true)"
-  [ -n "$dev" ] || { red "No 'Acer WMI hotkeys' input device found."; exit 1; }
+  [ -n "$dev" ] || { red "Could not find the AT keyboard input device."; exit 1; }
 
   dim "  device: /dev/input/$dev"
   echo ""
   warn "  Press the NitroSense key now. Ctrl-C when you see its line."
   echo ""
-  dim "  Look for a line like:  code 148 (KEY_PROG1)"
+  dim "  Look for a line like:  code 425 (KEY_PRESENTATION)"
   dim "  Then re-run this script with the matching key:"
+  dim "     KEY_PRESENTATION -> XF86Presentation   (AN515-45 and similar)"
   dim "     KEY_PROG1 -> XF86Launch1      KEY_PROG3 -> XF86Launch3"
   dim "     KEY_PROG2 -> XF86Launch2      KEY_PROG4 -> XF86Launch4"
   echo ""
@@ -84,7 +86,7 @@ PY
   exit 0
 fi
 
-KEY="${1:-XF86Launch1}"
+KEY="${1:-XF86Presentation}"
 [ -x "$LAUNCHER" ] || { red "Launcher missing or not executable: $LAUNCHER"; exit 1; }
 
 if [ -z "$slot" ]; then

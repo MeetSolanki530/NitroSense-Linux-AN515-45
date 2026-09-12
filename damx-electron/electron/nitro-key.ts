@@ -35,12 +35,40 @@ const BASE = '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings';
 const ENTRY_NAME = 'Div Acer Manager Max';
 
 /**
- * KEY_PROG1..4 as X keysyms. These are what Acer's Nitro/Predator key reports
- * across models; which one varies, hence the detection.
+ * What the NitroSense/PredatorSense key can report, as X keysyms.
+ *
+ * XF86Presentation first because that is what it actually is on AN515-45:
+ * evdev KEY_PRESENTATION (425), scancode 0xf5, on the AT keyboard rather than
+ * the Acer WMI hotkeys device. Confirmed with evtest, and it matches the
+ * upstream DAMX key watcher, which greps that same code 425.
+ *
+ *   X keycode 433 = evdev 425 + 8
+ *   /usr/share/X11/xkb/symbols/inet: key <I433> { [ XF86Presentation ] }
+ *
+ * The XF86Launch* entries stay because KEY_PROG1..4 is what several other
+ * Predator/Nitro models report, and which one a model uses is exactly what
+ * this detection exists to find out.
  */
-export const CANDIDATES = ['XF86Launch1', 'XF86Launch2', 'XF86Launch3', 'XF86Launch4'] as const;
+export const CANDIDATES = [
+  'XF86Presentation',
+  'XF86Launch1',
+  'XF86Launch2',
+  'XF86Launch3',
+  'XF86Launch4',
+] as const;
 
 export const MARKER = '--nitro-key=';
+
+/**
+ * Offered when the key turns out to be invisible to the OS.
+ *
+ * On some models — AN515-45 among them — the NitroSense key never reaches the
+ * kernel at all: no WMI event, no input event. It is handled inside the EC.
+ * Nothing can bind a key that produces no event, so the fallback is an
+ * ordinary shortcut the user presses instead.
+ */
+export const FALLBACK_ACCELERATOR = '<Control><Alt>n';
+export const FALLBACK_LABEL = 'Ctrl+Alt+N';
 
 export type NitroKeyConfig = {
   /** Set once the user has either bound a key or explicitly declined. */

@@ -90,6 +90,9 @@ export type NitroKeyState = {
   /** False outside GNOME-family sessions, where there is no shortcut store. */
   available: boolean;
   candidates: string[];
+  /** Offered when the key turns out to be invisible to the desktop. */
+  fallback: string;
+  fallbackLabel: string;
 };
 
 declare global {

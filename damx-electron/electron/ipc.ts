@@ -24,7 +24,9 @@ import {
 } from './validate.ts';
 import type { Telemetry } from './telemetry.ts';
 import { applyPowerMode, readPowerState, targetFor } from './cpupower.ts';
-import { available as nitroKeyAvailable, CANDIDATES } from './nitro-key.ts';
+import {
+  available as nitroKeyAvailable, CANDIDATES, FALLBACK_ACCELERATOR, FALLBACK_LABEL,
+} from './nitro-key.ts';
 import type { NitroKey } from './nitro-key.ts';
 
 export const CH = {
@@ -99,11 +101,14 @@ const HANDLERS: Record<string, Handler> = {
     ...(await nitroKey.config()),
     available: await nitroKeyAvailable(),
     candidates: [...CANDIDATES],
+    fallback: FALLBACK_ACCELERATOR,
+    fallbackLabel: FALLBACK_LABEL,
   }),
   nitroKeyBegin: async ({ nitroKey }) => ({ ok: await nitroKey.beginDetection() }),
   nitroKeyConfirm: async ({ nitroKey }, a) => {
     const accel = nonEmptyString(a.accelerator, 'accelerator');
-    if (!(CANDIDATES as readonly string[]).includes(accel)) {
+    const allowed = [...CANDIDATES, FALLBACK_ACCELERATOR] as readonly string[];
+    if (!allowed.includes(accel)) {
       throw new Error(`Unknown accelerator: ${accel}`);
     }
     await nitroKey.confirm(accel);
