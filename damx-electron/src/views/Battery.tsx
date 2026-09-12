@@ -37,17 +37,14 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
   const backlight = settingBool(settings, 'backlight_timeout');
   const usb = usbLevel(settings);
 
-  // The driver's GET decoder doesn't recognise this model's raw WMI
-  // response for some of these, so the current state can read back
-  // unknown even though SET is independent of that decoder and does work
-  // (confirmed: backlight_timeout set status: 0, no ACPI failure, and its
-  // readout later resolved to a real value). Used only to explain an
-  // "unknown" readout, never to disable a toggle on its own.
+  // "-1" from the driver means it could not read the setting at all.
   //
-  // lcd_override is excluded from that claim: repeated direct writes were
-  // confirmed to have no hardware effect at all (see the `broken` prop on
-  // its Toggle below), which is a different, stronger finding than "merely
-  // unreadable" — so it must not appear in the shared "still works" hint.
+  // These two are not the same case. backlight_timeout can read unknown while
+  // its writes still land, so it stays usable and only gets an explanatory
+  // hint. boot_animation_sound reads unknown because the firmware returns an
+  // error status for the query, and returns the same error for writes, which
+  // leave the stored value unchanged — so it is disabled outright rather than
+  // inviting a click that errors.
   const bootUnreadable = settingUnsupported(settings, 'boot_animation_sound');
   const backlightUnreadable = settingUnsupported(settings, 'backlight_timeout');
 
@@ -184,6 +181,13 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
           value={boot}
           busy={busy}
           disabled={!connected || !has('boot_animation_sound')}
+          broken={
+            bootUnreadable
+              ? 'This firmware refuses the setting: both reading and writing it come ' +
+                'back with an error status, and a write leaves the stored value ' +
+                'unchanged. Nothing to apply on this machine.'
+              : undefined
+          }
           onChange={(next) => void run(() => window.damx.setBootAnimationSound(next))}
         />
         <Toggle
@@ -195,7 +199,7 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
           onChange={(next) => void run(() => window.damx.setBacklightTimeout(next))}
         />
         <MissingNote has={has} features={['lcd_override', 'boot_animation_sound', 'backlight_timeout']} />
-        {(bootUnreadable || backlightUnreadable) && (
+        {backlightUnreadable && (
           <p className="control-hint dim">
             Controls marked “unknown” can&rsquo;t have their current state confirmed on
             this model, since the driver&rsquo;s decoder doesn&rsquo;t recognise the value it

@@ -1,0 +1,46 @@
+--- a/src/linuwu_sense.c
++++ b/src/linuwu_sense.c
+@@ -3910,9 +3910,22 @@
+         pr_err("Error getting boot_animation_sound status: %s\n", acpi_format_exception(status));
+         return -ENODEV;
+     }
+-    pr_info("boot_animation_sound get status: %llu\n", result);
+-    return sprintf(buf, "%d\n", result == 0x100 ? 1 : result == 0 ? 0
+-                                                                  : -1);
++    /* The result is a misc-setting reply: status in bits 7:0, value in bits
++     * 15:8. Decode it as such rather than comparing the whole word against
++     * magic constants — 0x100 is simply "status 0, value 1", and a raw 1 is
++     * "status 1, value 0", i.e. the firmware refusing the query. Comparing
++     * against constants makes a refusal indistinguishable from a value, and
++     * on hardware that refuses this setting it displayed as enabled. */
++    if (FIELD_GET(ACER_GAMING_MISC_SETTING_STATUS_MASK, result))
++    {
++        pr_info("boot_animation_sound get refused, status=%llu raw=%llu\n",
++                FIELD_GET(ACER_GAMING_MISC_SETTING_STATUS_MASK, result), result);
++        /* -1 is this driver's "cannot read" convention. */
++        return sprintf(buf, "-1\n");
++    }
++
++    return sprintf(buf, "%llu\n",
++                   FIELD_GET(ACER_GAMING_MISC_SETTING_VALUE_MASK, result));
+ }
+ 
+ static ssize_t predator_boot_animation_sound_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+@@ -3931,7 +3944,16 @@
+         pr_err("Error setting boot_animation_sound status: %s\n", acpi_format_exception(status));
+         return -ENODEV;
+     }
+-    pr_info("boot_animation_sound set status: %llu\n", result);
++    /* This only checked ACPI_FAILURE, so a firmware refusal still reported
++     * success to userspace: the toggle moved, nothing changed, and nothing
++     * said so. The reply's low byte is the status; nonzero means refused. */
++    if (FIELD_GET(ACER_GAMING_MISC_SETTING_STATUS_MASK, result))
++    {
++        pr_warn("boot_animation_sound set(%d) refused by firmware, status=%llu\n",
++                val, FIELD_GET(ACER_GAMING_MISC_SETTING_STATUS_MASK, result));
++        return -EIO;
++    }
++
+     return count;
+ }
+ 

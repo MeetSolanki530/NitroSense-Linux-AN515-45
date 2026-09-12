@@ -37,12 +37,40 @@ parameter, *before* DMI matching runs — so the driver must be loaded with **no
 parameters** for this entry to take effect. `scripts/try-driver.sh` does that by
 default.
 
+## linuwu-sense-misc-setting-status.patch
+
+Decodes misc-setting replies instead of comparing them to magic constants.
+
+`boot_animation_sound` read its reply as `result == 0x100 ? 1 : result == 0 ? 0
+: -1`. But the reply is a packed struct, not a scalar:
+
+```c
+STATUS_MASK = GENMASK_ULL(7, 0)    /* low byte  */
+VALUE_MASK  = GENMASK_ULL(15, 8)   /* next byte */
+```
+
+So `0x100` is just "status 0, value 1", and a raw `1` is "status 1, value 0" —
+the firmware *refusing the query*. Comparing against constants makes a refusal
+indistinguishable from a value, and on hardware that refuses this setting it
+displayed as **enabled**.
+
+The write path had the matching bug: it checked only `ACPI_FAILURE` and ignored
+the status byte, so a refused write still returned success. The toggle moved,
+nothing changed, and nothing said so.
+
+On AN515-45 both calls return status 1 and a write leaves the stored value
+unchanged, so the setting is genuinely unsupported there — but this patch is
+not model-specific: it is how the reply is defined for every model.
+
 ### Applying
 
 ```bash
 cd Linuwu-Sense
 patch -p1 < ../patches/linuwu-sense-an515-45-rgb.patch
+patch -p1 < ../patches/linuwu-sense-misc-setting-status.patch
 ```
+
+They touch different functions and apply cleanly in either order.
 
 Then load it non-persistently:
 
