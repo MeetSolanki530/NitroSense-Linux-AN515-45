@@ -41,12 +41,26 @@ function runInRenderer(code: string): Promise<unknown> {
 }
 
 async function main(): Promise<void> {
-  const mock = spawn('python3', ['scripts/mock-daemon.py', SOCK, '--start-forced'], {
+  // Started unforced: the internals test needs the thin-feature starting
+  // state, and every other section forces what it needs first.
+  const mock = spawn('python3', ['scripts/mock-daemon.py', SOCK], {
     stdio: 'ignore', detached: false,
   });
   await sleep(1200);
 
   try {
+    console.log('\n0. Unlock features (mock starts unforced, like an AN515-45)');
+    const r0 = (await runInRenderer(`
+      (async () => {
+        const before = (await window.damx.getSettings()).available_features.length;
+        await window.damx.forceModel('nitro_v4');
+        const after = (await window.damx.getSettings()).available_features.length;
+        return { before, after };
+      })()
+    `)) as { before: number; after: number };
+    check('starts with one feature', r0.before === 1, String(r0.before));
+    check('forcing nitro_v4 unlocks the rest', r0.after === 10, String(r0.after));
+
     console.log('\n1. Thermal profile write is accepted and reconciled');
     const r1 = (await runInRenderer(`
       (async () => {
@@ -156,7 +170,46 @@ async function main(): Promise<void> {
     check('state unchanged after rejections',
       r7.after === '112233,445566,778899,aabbcc,75', r7.after);
 
-    console.log('\n6. Unknown methods are unreachable from the renderer');
+    console.log('\n6. Internals: disruptive command, disconnect, reconnect, diff');
+    const r8 = (await runInRenderer(`
+      (async () => {
+        // Earlier sections already forced the driver, so clear it first —
+        // otherwise the diff below would be measuring nothing.
+        await window.damx.removeParameter();
+        const before = await window.damx.internalsState();
+        // The daemon kills itself mid-request here; the client must treat the
+        // dropped connection as expected and reconnect on its own.
+        const result = await window.damx.persistParameter('nitro_v4');
+        const after = await window.damx.internalsState();
+        let rejected = null;
+        try { await window.damx.forceModel('rm -rf /'); }
+        catch (e) { rejected = e.message; }
+        return {
+          beforeFeatures: before.features.length,
+          beforeParam: before.modprobeParameter,
+          daemonReturned: result.daemonReturned,
+          ok: result.ok,
+          gained: result.diff ? result.diff.gained.length : -1,
+          lost: result.diff ? result.diff.lost.length : -1,
+          afterFeatures: after.features.length,
+          afterParam: after.modprobeParameter,
+          afterType: after.laptopType,
+          rejected,
+        };
+      })()
+    `)) as Record<string, unknown>;
+    check('starts unforced with a thin feature set', r8.beforeFeatures === 1, String(r8.beforeFeatures));
+    check('starts with no modprobe parameter', r8.beforeParam === '', String(r8.beforeParam));
+    check('daemon came back after restarting itself', r8.daemonReturned === true);
+    check('operation reported ok', r8.ok === true);
+    check('features were gained', r8.gained === 9, String(r8.gained));
+    check('nothing was lost', r8.lost === 0, String(r8.lost));
+    check('parameter is now persistent', r8.afterParam === 'nitro_v4', String(r8.afterParam));
+    check('laptop type is now detected', r8.afterType === 'NITRO', String(r8.afterType));
+    check('rejects an arbitrary modprobe parameter',
+      /must be one of/.test(String(r8.rejected)), String(r8.rejected));
+
+    console.log('\n7. Unknown methods are unreachable from the renderer');
     const r6 = (await runInRenderer(`
       (async () => ({
         keys: Object.keys(window.damx).length,

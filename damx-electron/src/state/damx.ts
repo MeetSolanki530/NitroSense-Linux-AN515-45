@@ -35,6 +35,33 @@ export type Settings = {
   [k: string]: unknown;
 };
 
+export type InternalsState = {
+  laptopType: string;
+  driverVersion: string;
+  modprobeParameter: string;
+  hasFourZoneKb: boolean;
+  daemonVersion: string;
+  features: string[];
+};
+
+export type FeatureDiff = {
+  before: string[];
+  after: string[];
+  gained: string[];
+  lost: string[];
+};
+
+export type OperationResult = {
+  command: string;
+  ok: boolean;
+  daemonReturned: boolean;
+  before: InternalsState;
+  after: InternalsState | null;
+  diff: FeatureDiff | null;
+  warning?: string;
+  error?: string;
+};
+
 declare global {
   interface Window {
     damx: {
@@ -51,12 +78,12 @@ declare global {
       setUsbCharging(level: number): Promise<unknown>;
       setPerZoneMode(zones: string[], brightness: number): Promise<unknown>;
       setFourZoneMode(cfg: Record<string, number>): Promise<unknown>;
-      internalsState(): Promise<unknown>;
-      forceModel(parameter: string): Promise<unknown>;
-      persistParameter(parameter: string): Promise<unknown>;
-      removeParameter(): Promise<unknown>;
-      restartDaemon(): Promise<unknown>;
-      restartDriversAndDaemon(): Promise<unknown>;
+      internalsState(): Promise<InternalsState>;
+      forceModel(parameter: string): Promise<OperationResult>;
+      persistParameter(parameter: string): Promise<OperationResult>;
+      removeParameter(): Promise<OperationResult>;
+      restartDaemon(): Promise<OperationResult>;
+      restartDriversAndDaemon(): Promise<OperationResult>;
       onTelemetry(cb: (t: Telemetry) => void): () => void;
       onConnection(cb: (s: ConnectionState) => void): () => void;
       window: { minimize(): void; maximize(): void; close(): void };

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TitleBar } from './components/TitleBar';
 import type { Tab } from './components/TitleBar';
-import { Placeholder } from './views/Placeholder';
 import { Home } from './views/Home';
 import { Performance } from './views/Performance';
 import { Battery } from './views/Battery';
 import { Keyboard } from './views/Keyboard';
+import { Internals } from './views/Internals';
+import { Monitoring } from './views/Monitoring';
 import { useConnection, useSettings, useTelemetry } from './state/damx';
 import './components/TitleBar.css';
 import './App.css';
@@ -74,12 +75,9 @@ export function App(): JSX.Element {
         {active === 'keyboard' && (
           <Keyboard settings={settings} has={has} connection={connection} refresh={refresh} />
         )}
-        {active === 'monitoring' && (
-          <Placeholder title="Monitoring" step="step 5" has={has} requires={[]} />
-        )}
+        {active === 'monitoring' && <Monitoring telemetry={telemetry} />}
         {active === 'internals' && (
-          <Placeholder title="Internals Manager" step="a later step (logic is done)" has={has}
-            requires={[]} />
+          <Internals connection={connection} refresh={refresh} />
         )}
 
       </main>

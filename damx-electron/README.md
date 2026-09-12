@@ -148,8 +148,8 @@ bug. Fan `0/0` means automatic; switching to Manual does not write until a
 slider actually moves.
 
 ```bash
-npm test          # validation, telemetry, formatting  (130 assertions)
-npm run test:e2e  # real writes through the full chain (25 assertions)
+npm test          # validation, telemetry, formatting  (149 assertions)
+npm run test:e2e  # real writes through the full chain (36 assertions)
 ```
 
 The e2e suite launches the actual Electron app against the mock daemon and
@@ -246,6 +246,27 @@ before writing. Restore with:
 ```bash
 sudo ./scripts/install-frontend.sh --uninstall
 ```
+
+## Internals Manager and Monitoring views
+
+The Internals screen binds to the same `electron/internals.ts` module the CLI
+uses, so the two cannot drift. It shows driver status, the active modprobe
+parameter and the live feature list, and separates the three command classes
+(Force / Persist / Recovery) because they differ in persistence and risk.
+Every operation is confirmed first, shows progress while the daemon restarts
+itself, and then reports the **before/after feature diff** — the only reliable
+signal that a `modprobe` reload succeeded, since a failed one returns no error
+and simply drops features.
+
+When features look incomplete and no parameter is set, it says so and points
+at `nitro_v4`.
+
+Monitoring charts everything the telemetry poller reads. Two rules in
+`src/components/series.ts` keep the charts honest: nulls **break the line**
+rather than plotting as zero (a suspended GPU has not cooled to 0 °C), and all
+series are **anchored at the right edge** so readings from different moments
+never share a column — series start at different times, since the GPU line
+only begins when the card wakes.
 
 ## Protocol notes
 
