@@ -10,7 +10,7 @@ import { useState, type JSX } from 'react';
 import { ControlBlock, Slider, gateFor } from '../components/Control';
 import { ModeTile } from '../components/ModeTile';
 import { useCommand, useDebounced, useOptimistic } from '../state/useCommand';
-import { prettyMode } from './homeFormat';
+import { prettyMode, profileUnreadable } from './homeFormat';
 import type { ConnectionState, Settings, Telemetry } from '../state/damx';
 import './Performance.css';
 
@@ -46,6 +46,7 @@ export function Performance({
   const choices = settings?.thermal_profile?.available ?? [];
   const currentProfile = settings?.thermal_profile?.current ?? '';
   const profile = useOptimistic(currentProfile);
+  const unreadable = profileUnreadable(currentProfile, choices);
 
   const auto = isAuto(settings);
   const [manual, setManual] = useState(!auto);
@@ -101,6 +102,14 @@ export function Performance({
             : undefined
         }
       >
+        {unreadable && (
+          <p className="profile-warning">
+            The driver reports the available profiles but cannot read the current one
+            (<code>platform_profile</code> returns an I/O error). Selecting a mode may
+            also fail. Acer firmware commonly restricts thermal profiles while on
+            battery — try again with the charger connected.
+          </p>
+        )}
         {choices.length === 0 ? (
           <p className="dim">No thermal profiles reported.</p>
         ) : (

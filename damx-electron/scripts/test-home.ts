@@ -3,7 +3,7 @@
  * Rendering is verified separately by scripts/smoke.sh.
  */
 import { arcPath, fraction, ticks } from '../src/components/geometry.ts';
-import { fanLabel, prettyMode } from '../src/views/homeFormat.ts';
+import { fanLabel, prettyMode, profileUnreadable } from '../src/views/homeFormat.ts';
 
 let passed = 0;
 let failed = 0;
@@ -29,9 +29,18 @@ check('ticks light up to the value', t.filter((x) => x.lit).length === 5,
 check('no ticks lit at zero', ticks(50, 50, 48, 40, 0, 360, 10, 0).filter((x) => x.lit).length === 1);
 
 console.log('\n2. Mode labels (kernel names are not presentation text)');
-check('low-power reads as Quiet', prettyMode('low-power') === 'Quiet');
+// This machine reports five profiles; every label must be distinct or the
+// tiles become indistinguishable.
+const REAL = ['low-power', 'quiet', 'balanced', 'balanced-performance', 'performance'];
+const labels = REAL.map(prettyMode);
+check('all five real profiles get distinct labels',
+  new Set(labels).size === REAL.length, labels.join(', '));
+check('low-power is not confused with quiet',
+  prettyMode('low-power') !== prettyMode('quiet'));
+check('performance is not confused with balanced-performance',
+  prettyMode('performance') !== prettyMode('balanced-performance'));
 check('balanced reads as Balanced', prettyMode('balanced') === 'Balanced');
-check('performance reads as Performance', prettyMode('performance') === 'Performance');
+check('quiet reads as Quiet', prettyMode('quiet') === 'Quiet');
 check('unknown kernel name is title-cased, not dropped',
   prettyMode('some_new-mode') === 'Some new mode', prettyMode('some_new-mode'));
 check('missing profile does not render blank', prettyMode(undefined) === 'Unknown');
@@ -43,6 +52,16 @@ check('absent fan_speed renders --', fanLabel({}) === '--');
 check('null settings render --', fanLabel(null) === '--');
 check('garbage values render -- rather than NaN',
   fanLabel({ fan_speed: { cpu: 'x', gpu: 'y' } }) === '--');
+
+console.log('\n4. Unreadable current profile');
+check('choices present but no current means unreadable',
+  profileUnreadable('', ['balanced', 'performance']) === true);
+check('a real current profile is readable',
+  profileUnreadable('balanced', ['balanced', 'performance']) === false);
+check('no choices at all is not "unreadable"',
+  profileUnreadable('', []) === false);
+check('undefined current with choices is unreadable',
+  profileUnreadable(undefined, ['balanced']) === true);
 
 console.log(`\n${failed === 0 ? '\x1b[32m' : '\x1b[31m'}${passed} passed, ${failed} failed\x1b[0m\n`);
 process.exit(failed === 0 ? 0 : 1);

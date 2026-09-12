@@ -5,7 +5,9 @@
  * "off". A toggle showing off for a feature it cannot read misrepresents the
  * hardware.
  */
-import { batterySummary, settingBool, toBool, usbLabel, usbLevel } from '../src/state/format.ts';
+import {
+  batterySummary, isUnsupported, settingBool, settingUnsupported, toBool, usbLabel, usbLevel,
+} from '../src/state/format.ts';
 
 let passed = 0;
 let failed = 0;
@@ -31,6 +33,15 @@ check('absent key is unknown', settingBool({}, 'lcd_override') === null);
 check('null settings are unknown', settingBool(null, 'lcd_override') === null);
 check('present "0" is false', settingBool({ lcd_override: '0' }, 'lcd_override') === false);
 check('present "1" is true', settingBool({ lcd_override: '1' }, 'lcd_override') === true);
+
+console.log('\n2b. -1 means "this model does not implement it"');
+check('"-1" is recognised as unsupported', isUnsupported('-1') === true);
+check('"0" is not unsupported', isUnsupported('0') === false);
+check('"1" is not unsupported', isUnsupported('1') === false);
+check('"-1" does not parse as a boolean', toBool('-1') === null);
+check('settingUnsupported finds it', settingUnsupported({ lcd_override: '-1' }, 'lcd_override') === true);
+check('a real value is supported', settingUnsupported({ lcd_override: '0' }, 'lcd_override') === false);
+check('an absent key is not "unsupported"', settingUnsupported({}, 'lcd_override') === false);
 
 console.log('\n3. USB charging level');
 check('reads 10', usbLevel({ usb_charging: '10' }) === 10);

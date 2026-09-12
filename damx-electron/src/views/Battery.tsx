@@ -10,7 +10,9 @@ import { useState, type JSX } from 'react';
 import { ControlBlock, connectionGate, gateFor } from '../components/Control';
 import { Toggle } from '../components/Toggle';
 import { useCommand } from '../state/useCommand';
-import { USB_LEVELS, batterySummary, settingBool, usbLabel, usbLevel } from '../state/format';
+import {
+  USB_LEVELS, batterySummary, settingBool, settingUnsupported, usbLabel, usbLevel,
+} from '../state/format';
 import type { UsbLevel } from '../state/format';
 import type { ConnectionState, Settings, Telemetry } from '../state/damx';
 import './Battery.css';
@@ -34,6 +36,11 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
   const boot = settingBool(settings, 'boot_animation_sound');
   const backlight = settingBool(settings, 'backlight_timeout');
   const usb = usbLevel(settings);
+
+  // The driver reports -1 for attributes this model does not implement.
+  const lcdUnsupported = settingUnsupported(settings, 'lcd_override');
+  const bootUnsupported = settingUnsupported(settings, 'boot_animation_sound');
+  const backlightUnsupported = settingUnsupported(settings, 'backlight_timeout');
 
   const pct = telemetry?.battery.percent ?? null;
 
@@ -152,6 +159,7 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
           description="Allows the panel to run outside its default timing profile."
           value={lcd}
           busy={busy}
+          unsupported={lcdUnsupported}
           disabled={!connected || !has('lcd_override')}
           onChange={(next) => void run(() => window.damx.setLcdOverride(next))}
         />
@@ -160,6 +168,7 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
           description="The Acer splash animation and chime at power-on."
           value={boot}
           busy={busy}
+          unsupported={bootUnsupported}
           disabled={!connected || !has('boot_animation_sound')}
           onChange={(next) => void run(() => window.damx.setBootAnimationSound(next))}
         />
@@ -168,10 +177,17 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
           description="Dim the keyboard backlight after 30 seconds idle."
           value={backlight}
           busy={busy}
+          unsupported={backlightUnsupported}
           disabled={!connected || !has('backlight_timeout')}
           onChange={(next) => void run(() => window.damx.setBacklightTimeout(next))}
         />
         <MissingNote has={has} features={['lcd_override', 'boot_animation_sound', 'backlight_timeout']} />
+        {(lcdUnsupported || bootUnsupported || backlightUnsupported) && (
+          <p className="control-hint dim">
+            Controls marked “not supported” exist in the driver but return -1 on this
+            model, meaning the firmware does not implement them.
+          </p>
+        )}
       </ControlBlock>
     </div>
   );

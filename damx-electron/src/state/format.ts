@@ -21,6 +21,22 @@ export function toBool(raw: unknown): Tri {
   return null;
 }
 
+/**
+ * The driver writes -1 into an attribute its model does not implement. On
+ * AN515-45 that is backlight_timeout, boot_animation_sound and lcd_override:
+ * the files exist, so the daemon lists the features as available, but the
+ * value is -1 rather than 0 or 1. That is "not supported on this model",
+ * which is a different and more useful statement than "unknown".
+ */
+export function isUnsupported(raw: unknown): boolean {
+  return typeof raw === 'string' && raw.trim() === '-1';
+}
+
+export function settingUnsupported(settings: Settings | null, key: string): boolean {
+  if (!settings || !(key in settings)) return false;
+  return isUnsupported(settings[key]);
+}
+
 export function settingBool(settings: Settings | null, key: string): Tri {
   if (!settings || !(key in settings)) return null;
   return toBool(settings[key]);
