@@ -119,6 +119,8 @@ cd app
 One command, brings up the driver, the service and the app together. Nothing
 persists, a reboot clears it. Good for testing.
 
+Full build, test, release and cleanup steps are in [BUILDING.md](BUILDING.md).
+
 ## 🐛 Something broken?
 
 Logs live here:
