@@ -98,7 +98,7 @@ export function fourZoneConfig(a: Record<string, unknown>): {
   red: number; green: number; blue: number;
 } {
   return {
-    mode: intInRange(a.mode, 0, 7, 'mode'),
+    mode: intInRange(a.mode, 0, 5, 'mode'),
     speed: intInRange(a.speed, 0, 9, 'speed'),
     brightness: intInRange(a.brightness, 0, 100, 'brightness'),
     direction: intInRange(a.direction, 1, 2, 'direction'),

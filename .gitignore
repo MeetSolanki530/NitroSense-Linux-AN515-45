@@ -19,3 +19,6 @@ DAMM-Daemon/__pycache__/
 
 # Third-party kernel driver source, fetched by setup (has its own upstream)
 Linuwu-Sense/
+
+# Third-party driver source for comparison testing (has its own upstream)
+acer-turbo/

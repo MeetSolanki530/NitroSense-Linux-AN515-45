@@ -7,9 +7,14 @@
  *                   zones are 6-digit hex without a leading #
  *   four_zone_mode  "mode,speed,brightness,direction,red,green,blue"
  *
- * Effect names are taken from the daemon's own table (DAMX-Daemon.py:652):
- *   0 Static, 1 Breathing, 2 Neon, 3 Wave, 4 Shifting, 5 Zoom, 6 Meteor,
- *   7 Twinkling.
+ * Acer's WMI interface implements six effects:
+ *   0 Static, 1 Breathing, 2 Neon, 3 Wave, 4 Shifting, 5 Zoom.
+ *
+ * The driver's switch also has cases for 6 (Meteor) and 7 (Twinkling), and
+ * the daemon's table repeats them, but the firmware never implemented those
+ * two: writing either is accepted and leaves the keyboard dark. Confirmed on
+ * AN515-45, and every independent reverse-engineering of this interface
+ * (facer, Acer-SenSe) stops at 5.
  */
 
 export type PerZone = { zones: [string, string, string, string]; brightness: number };
@@ -27,10 +32,10 @@ export type FourZone = {
 /**
  * Which inputs each effect actually uses.
  *
- * Taken from the driver's own switch statement in four_zoned_rgb_kb_store
- * (linuwu_sense.c:4167-4199), which silently zeroes the fields an effect does
- * not use before issuing the WMI call. Offering a control the driver is about
- * to discard would be misleading, so each effect declares what it honours.
+ * The driver used to zero the fields it believed an effect ignored, which on
+ * AN515-45 switched several effects off outright (a breath at speed 0 sits at
+ * the dark end of its cycle). It now passes everything through except for
+ * static, so these flags describe what the firmware itself honours.
  */
 export type Effect = {
   mode: number;
@@ -43,18 +48,17 @@ export type Effect = {
 
 export const EFFECTS: Effect[] = [
   { mode: 0, name: 'Static', usesColour: true, usesSpeed: false, usesDirection: false,
-    note: 'A fixed colour. The driver ignores speed and direction here.' },
-  { mode: 1, name: 'Breathing', usesColour: true, usesSpeed: false, usesDirection: false,
-    note: 'The driver zeroes speed for this effect; its rate is fixed in firmware.' },
+    note: 'A fixed colour. Speed and direction do not apply.' },
+  { mode: 1, name: 'Breathing', usesColour: true, usesSpeed: true, usesDirection: false,
+    note: 'Pulses the colour on and off. Speed sets the rate.' },
   { mode: 2, name: 'Neon', usesColour: false, usesSpeed: true, usesDirection: false,
-    note: 'Cycles its own colours — the driver discards any colour you set.' },
+    note: 'Cycles through its own colours, so the colour picker does not apply.' },
   { mode: 3, name: 'Wave', usesColour: false, usesSpeed: true, usesDirection: true,
-    note: 'The driver discards colour for Wave and uses direction instead.' },
+    note: 'Sweeps its own colours across the zones in the chosen direction.' },
   { mode: 4, name: 'Shifting', usesColour: true, usesSpeed: true, usesDirection: true,
     note: 'The only effect that uses every input.' },
-  { mode: 5, name: 'Zoom', usesColour: true, usesSpeed: true, usesDirection: false },
-  { mode: 6, name: 'Meteor', usesColour: true, usesSpeed: true, usesDirection: false },
-  { mode: 7, name: 'Twinkling', usesColour: true, usesSpeed: true, usesDirection: false },
+  { mode: 5, name: 'Zoom', usesColour: true, usesSpeed: true, usesDirection: false,
+    note: 'Pulses out from the centre of the keyboard.' },
 ];
 
 export function effectFor(mode: number): Effect {
@@ -66,7 +70,7 @@ export const DIRECTIONS: { value: number; label: string }[] = [
   { value: 2, label: 'Left to right' },
 ];
 
-/** Speed is honoured by every effect except Static and Breathing. */
+/** Speed is honoured by every effect except Static. */
 export function usesAnimation(mode: number): boolean {
   return effectFor(mode).usesSpeed;
 }
@@ -76,7 +80,7 @@ export function usesDirection(mode: number): boolean {
   return effectFor(mode).usesDirection;
 }
 
-/** Neon and Wave generate their own colours; the driver discards yours. */
+/** Neon and Wave generate their own colours, so a colour choice does nothing. */
 export function usesColour(mode: number): boolean {
   return effectFor(mode).usesColour;
 }
@@ -116,7 +120,7 @@ export function parseFourZone(raw: unknown): FourZone | null {
 
   const [mode, speed, brightness, direction, red, green, blue] = parts as number[];
   return {
-    mode: clampInt(mode as number, 0, 7),
+    mode: clampInt(mode as number, 0, 5),
     speed: clampInt(speed as number, 0, 9),
     brightness: clampInt(brightness as number, 0, 100),
     // Anything outside 1-2 is meaningless; fall back to the daemon's default.

@@ -1,0 +1,161 @@
+--- a/src/linuwu_sense.c
++++ b/src/linuwu_sense.c
+@@ -560,6 +560,15 @@
+     .four_zone_kb = 1,
+  };
+ 
++/* This model does have a four-zone keyboard; it lights once the per-zone
++ * write uses the 4-byte payload. Declaring it here exposes four_zoned_kb
++ * without enable_all, which would also force the predator quirks and change
++ * how the Fn+F9/F10 backlight keys are decoded. */
++static struct quirk_entry quirk_acer_nitro_an515_45 = {
++    .nitro_v4 = 1,
++    .four_zone_kb = 1,
++};
++
+ 
+ static struct quirk_entry quirk_acer_nitro = {
+     .nitro_sense = 1,
+@@ -669,6 +678,15 @@
+     },
+     {
+          .callback = dmi_matched,
++         .ident = "Acer Nitro AN515-45",
++         .matches = {
++             DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
++             DMI_MATCH(DMI_PRODUCT_NAME, "Nitro AN515-45"),
++         },
++         .driver_data = &quirk_acer_nitro_an515_45,
++    },
++    {
++         .callback = dmi_matched,
+          .ident = "Acer Nitro AN515-46",
+          .matches = {
+              DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+@@ -3986,7 +4004,11 @@
+                                  int direction, int red, int green, int blue)
+ {
+     u64 resp = 0;
+-    u8 gmInput[16] = {mode, speed, brightness, 0, direction, red, green, blue, 3, 1, 0, 0, 0, 0, 0, 0};
++    /* Byte 8 must be 0, and byte 3 carries a wave-only flag. With byte 8 set
++     * to 3 the AN515-45 firmware accepts this call, reports success, and does
++     * nothing. facer sends 0 here and the keyboard lights. */
++    u8 gmInput[16] = {mode, speed, brightness, (mode == 3) ? 8 : 0,
++                      direction, red, green, blue, 0, 1, 0, 0, 0, 0, 0, 0};
+ 
+     acpi_status status;
+     union acpi_object *obj;
+@@ -4164,41 +4186,17 @@
+         return -EINVAL;
+     }
+ 
+-    switch (mode)
++    /* Only static is normalised. This driver used to zero fields per mode —
++     * speed for breathing, colour for neon, direction for zoom/meteor/
++     * twinkling — and on AN515-45 that switched those effects off outright: a
++     * breath at speed 0 parks at the dark end of its cycle, a neon at
++     * rgb 0,0,0 is black. facer passes every field through untouched and all
++     * effects light, so only static keeps its zeroing (which is what facer
++     * sends for static too). */
++    if (mode == 0x0)
+     {
+-    case 0x0: // Static mode: Ignore speed and direction
+-        speed = 0;
+-        direction = 0;
+-        break;
+-    case 0x1: // Breathing mode: Ignore speed
+         speed = 0;
+         direction = 0;
+-        break;
+-    case 0x2: // Neon mode: Ignore red, green, blue, and direction
+-        red = 0;
+-        green = 0;
+-        blue = 0;
+-        direction = 0;
+-        break;
+-    case 0x3: // Wave mode: Ignore red, green, and blue
+-        red = 0;
+-        green = 0;
+-        blue = 0;
+-        break;
+-    case 0x4: // Shifting mode: No restrictions (all values allowed)
+-        break;
+-    case 0x5: // Zoom mode: Ignore direction
+-        direction = 0;
+-        break;
+-    case 0x6: // Meteor mode: Ignore direction
+-        direction = 0;
+-        break;
+-    case 0x7: // Twinkling mode: Ignore direction
+-        direction = 0;
+-        break;
+-    default:
+-        pr_err("Invalid mode value.\n");
+-        return -EINVAL;
+     }
+ 
+     status = set_kb_status(mode, speed, brightness, direction, red, green, blue);
+@@ -4246,30 +4244,52 @@
+     return AE_OK;
+ }
+ 
++/* The firmware expects exactly these four bytes. Passing the same fields as
++ * an 8-byte u64 (what this driver did) is accepted and silently ignored on
++ * AN515-45; four bytes works, which is what facer sends. */
++struct led_zone_set_param
++{
++    u8 zone;
++    u8 red;
++    u8 green;
++    u8 blue;
++} __packed;
++
++static acpi_status set_zone_color(u8 zone_mask, u8 red, u8 green, u8 blue)
++{
++    struct led_zone_set_param param = {
++        .zone = zone_mask, .red = red, .green = green, .blue = blue};
++    struct acpi_buffer input = {(acpi_size)sizeof(param), &param};
++
++    return wmi_evaluate_method(WMID_GUID4, 0,
++                               ACER_WMID_SET_GAMING_RGB_KB_METHODID, &input, NULL);
++}
++
+ static acpi_status set_per_zone_color(struct per_zone_color *input)
+ {
+     acpi_status status;
+-    u64 *zones[] = {&input->zone1, &input->zone2, &input->zone3, &input->zone4};
++    u64 zones[] = {input->zone1, input->zone2, input->zone3, input->zone4};
+     u8 zone_ids[] = {0x1, 0x2, 0x4, 0x8};
+ 
+-    status = set_kb_status(0, 0, input->brightness, 0, 0, 0, 0);
+-    if (ACPI_FAILURE(status))
+-    {
+-        pr_err("Error setting KB status.\n");
+-        return -ENODEV;
+-    }
+-
++    /* Colours first, then the mode switch. The reverse order leaves the
++     * panel on the previous effect until the next write. */
+     for (int i = 0; i < 4; i++)
+     {
+-        *zones[i] = (cpu_to_be64(*zones[i]) >> 32) | zone_ids[i];
+-        status = WMI_gaming_execute_u64(ACER_WMID_SET_GAMING_RGB_KB_METHODID, *zones[i], NULL);
++        status = set_zone_color(zone_ids[i], (zones[i] >> 16) & 0xFF,
++                                (zones[i] >> 8) & 0xFF, zones[i] & 0xFF);
+         if (ACPI_FAILURE(status))
+         {
+             pr_err("Error setting KB color (zone %d): %s\n", i + 1, acpi_format_exception(status));
+             return status;
+         }
+     }
+-    /* set per_zone to 1*/
++
++    status = set_kb_status(0, 0, input->brightness, 0, 0, 0, 0);
++    if (ACPI_FAILURE(status))
++    {
++        pr_err("Error setting KB status.\n");
++        return status;
++    }
+ 
+     current_kb_state.per_zone = 1;
+ 

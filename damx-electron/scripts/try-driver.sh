@@ -12,20 +12,22 @@
 #
 # Everything it does is undone by --undo, and by a reboot regardless.
 #
-#   sudo ./scripts/try-driver.sh               load with nitro_v4=1
-#   sudo ./scripts/try-driver.sh --enable-all  load with enable_all=1
+#   sudo ./scripts/try-driver.sh               load with no parameters (default)
+#   sudo ./scripts/try-driver.sh --nitro-v4    force nitro_v4=1, skipping DMI
+#   sudo ./scripts/try-driver.sh --enable-all  force every quirk on
 #   sudo ./scripts/try-driver.sh --undo        unload and restore acer_wmi
 #
-# WHY --enable-all EXISTS
+# WHY THE DEFAULT PASSES NO PARAMETER
 #   The driver only creates the four_zoned_kb sysfs group when
 #       quirks->four_zone_kb || enable_all
-#   (linuwu_sense.c:4535). On models whose quirk entry has four_zone_kb = 0 —
-#   AN515-45 among them — nitro_v4 leaves keyboard RGB completely unexposed
-#   even where the hardware has it. enable_all forces the quirk on
-#   (linuwu_sense.c:489 and :1000) and the node appears.
+#   and find_quirks() returns early for nitro_v4 BEFORE dmi_check_system runs.
+#   So forcing nitro_v4=1 discards the AN515-45 DMI entry (which sets both
+#   nitro_v4 and four_zone_kb) and loses keyboard RGB. Passing nothing lets
+#   DMI matching pick the right quirk.
 #
-#   It also forces the predator_v4 and nitro_sense quirks, so it is a broader
-#   change than nitro_v4; if something else misbehaves, go back to nitro_v4.
+#   --enable-all also forces the predator_v4/nitro_sense/turbo quirks, which
+#   changes how the Fn+F9/F10 backlight keys are decoded. Avoid it unless a
+#   model genuinely has no DMI entry.
 #
 set -euo pipefail
 
@@ -106,12 +108,20 @@ undo() {
 [ "${1:-}" = "--undo" ] && undo
 
 # Which parameter to insert with.
+#
+# The default is NO parameter, so the driver's own DMI table picks the quirk.
+# That matters here: passing nitro_v4=1 short-circuits find_quirks() before
+# DMI matching runs (linuwu_sense.c find_quirks), which loses four_zone_kb and
+# with it the keyboard RGB node. The AN515-45 DMI entry sets both.
 if [ "${1:-}" = "--enable-all" ]; then
   MOD_PARAM="enable_all=1"
-  PARAM_NOTE="enable_all (exposes keyboard RGB where the model quirk does not)"
-else
+  PARAM_NOTE="enable_all (forces every quirk, including the predator ones)"
+elif [ "${1:-}" = "--nitro-v4" ]; then
   MOD_PARAM="nitro_v4=1"
-  PARAM_NOTE="nitro_v4 (AN515-series)"
+  PARAM_NOTE="nitro_v4 (forced; skips DMI matching)"
+else
+  MOD_PARAM=""
+  PARAM_NOTE="no parameters (DMI quirk decides)"
 fi
 
 head_ "Temporary driver load (nothing persistent is written)"
@@ -180,11 +190,15 @@ if [ -d "$PARAM_DIR" ]; then
   done
   dim "  active parameters:${ACTUAL:- none}"
 
-  WANT="${MOD_PARAM%%=*}"
-  if ! echo "$ACTUAL" | grep -qw "$WANT"; then
-    red "  Requested $WANT but the module reports:${ACTUAL:- none}"
-    red "  Not continuing, since any conclusion drawn now would be wrong."
-    exit 1
+  # Only verifiable when a parameter was actually requested; the default path
+  # deliberately passes none and lets the DMI table decide.
+  if [ -n "$MOD_PARAM" ]; then
+    WANT="${MOD_PARAM%%=*}"
+    if ! echo "$ACTUAL" | grep -qw "$WANT"; then
+      red "  Requested $WANT but the module reports:${ACTUAL:- none}"
+      red "  Not continuing, since any conclusion drawn now would be wrong."
+      exit 1
+    fi
   fi
 fi
 
@@ -203,12 +217,13 @@ if [ -d "$ATTR_DIR" ]; then
     ls "$ATTR_DIR/four_zoned_kb" 2>/dev/null | sed 's/^/    /'
   else
     warn "  keyboard RGB: no four_zoned_kb node"
-    if [ "$MOD_PARAM" != "enable_all=1" ]; then
-      dim "    This model's quirk has four_zone_kb = 0, so nitro_v4 never creates it."
-      dim "    Try:  sudo $0 --enable-all"
+    if [ -n "$MOD_PARAM" ]; then
+      dim "    A forced parameter skips DMI matching, which is where this model's"
+      dim "    four_zone_kb = 1 comes from. Re-run with no arguments."
     else
-      dim "    enable_all was used and the node still did not appear, so the"
-      dim "    controller is genuinely absent on this machine."
+      dim "    DMI matching did not set four_zone_kb for this machine. Check that"
+      dim "    the product name has a quirk entry in linuwu_sense.c:"
+      dim "      cat /sys/class/dmi/id/product_name"
     fi
   fi
 else

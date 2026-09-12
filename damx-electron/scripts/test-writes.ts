@@ -166,7 +166,7 @@ async function main(): Promise<void> {
     check('four-zone effect round-trips', r7.fourZone === '3,7,90,2,255,106,0', r7.fourZone);
     check('rejects a "#"-prefixed zone colour', /hex colour/.test(r7.hashZone ?? ''), r7.hashZone);
     check('rejects fewer than four zones', /exactly 4/.test(r7.shortZones ?? ''), r7.shortZones);
-    check('rejects effect mode 9', /between 0 and 7/.test(r7.badMode ?? ''), r7.badMode);
+    check('rejects effect mode 9', /between 0 and 5/.test(r7.badMode ?? ''), r7.badMode);
     check('state unchanged after rejections',
       r7.after === '112233,445566,778899,aabbcc,75', r7.after);
 

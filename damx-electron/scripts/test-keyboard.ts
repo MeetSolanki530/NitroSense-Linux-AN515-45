@@ -44,19 +44,19 @@ check('parses speed', fz?.speed === 7);
 check('parses brightness', fz?.brightness === 90);
 check('parses direction', fz?.direction === 2);
 check('parses rgb', fz?.red === 255 && fz?.green === 106 && fz?.blue === 0);
-check('clamps mode above 7', parseFourZone('99,5,50,1,0,0,0')?.mode === 7);
+check('clamps mode above 5', parseFourZone('99,5,50,1,0,0,0')?.mode === 5);
 check('clamps speed above 9', parseFourZone('0,50,50,1,0,0,0')?.speed === 9);
 check('falls back to direction 1 when invalid', parseFourZone('0,5,50,9,0,0,0')?.direction === 1);
 check('clamps rgb above 255', parseFourZone('0,5,50,1,999,0,0')?.red === 255);
 check('rejects too few fields', parseFourZone('0,5,50') === null);
 check('rejects non-numeric fields', parseFourZone('a,b,c,d,e,f,g') === null);
 
-console.log('\n4. Effect semantics (from the daemon table)');
-check('eight effects are exposed', EFFECTS.length === 8);
+console.log('\n4. Effect semantics (what the firmware honours)');
+check('six effects are exposed', EFFECTS.length === 6);
 check('mode 0 is Static', EFFECTS[0]?.name === 'Static');
-check('mode 7 is Twinkling', EFFECTS[7]?.name === 'Twinkling');
+check('mode 5 is Zoom', EFFECTS[5]?.name === 'Zoom');
 check('Static ignores speed', usesAnimation(0) === false);
-check('Breathing ignores speed (driver zeroes it)', usesAnimation(1) === false);
+check('Breathing uses speed', usesAnimation(1) === true);
 check('Neon uses speed', usesAnimation(2) === true);
 check('Shifting uses speed', usesAnimation(4) === true);
 
