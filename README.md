@@ -3,6 +3,8 @@
 NitroSense on Windows does fan control, power modes and keyboard lighting.
 On Linux you get none of it. This brings it back.
 
+![NitroSense running on Linux](screenshots/01-home.png)
+
 > ⚠️ **Built and tested on the Acer Nitro AN515-45 only.**
 > Other Nitro models may work but nothing here is tested on them.
 
@@ -66,6 +68,43 @@ The app shows them as unavailable instead of pretending.
   it. Power modes use the CPU governor instead, which does work.
 - **LCD override.** Writes report success, the value never changes.
 - **Boot animation and sound.** The firmware refuses both reading and writing.
+
+## 📸 Screenshots
+
+All taken on the AN515-45 with the daemon connected.
+
+**Performance.** Power mode and fan control. Manual holds a fixed duty cycle,
+automatic hands the fans back to the firmware.
+
+![Performance tab](screenshots/02-performance.png)
+
+**Battery.** Charge limiter, calibration and USB charging while the lid is shut.
+
+![Battery tab](screenshots/03-battery.png)
+
+**Keyboard.** Per zone colour across the four zones, with a preview and a
+brightness slider.
+
+![Keyboard tab](screenshots/04-keyboard.png)
+
+**Keyboard effects.** Six effects with speed and direction. Direction only
+applies to Wave and Shifting.
+
+![Keyboard effects](screenshots/05-keyboard-effects.png)
+
+**Monitoring.** Temperature and utilisation over time, plus every sensor the
+machine exposes.
+
+![Monitoring tab](screenshots/06-monitoring.png)
+
+**Internals.** Driver status, which features the firmware actually offers, and
+the modprobe parameter controls. Useful when something is not behaving.
+
+![Internals tab](screenshots/07-internals.png)
+
+**Splash.** What you see after pressing the NitroSense key, while it connects.
+
+![Splash screen](screenshots/08-splash.png)
 
 ## 📦 Install
 
