@@ -5,13 +5,20 @@ __pycache__/
 .idea/
 .vscode/
 *.swp
+*~
 
-# Build output
-app/node_modules/
+# Build output. node_modules and the packaged .deb are matched anywhere, not
+# just under app/, so a build run from a subdirectory cannot slip one in.
+node_modules/
 app/dist/
 app/dist-electron/
 app/release/
 app/logs/
+*.deb
+
+# Desktop clutter
+.DS_Store
+Thumbs.db
 
 # Third-party kernel driver source, fetched by setup (has its own upstream)
 Linuwu-Sense/
@@ -19,7 +26,6 @@ Linuwu-Sense/
 # Local working notes and reference checkouts of other drivers, kept on disk
 # for comparison while debugging. Not part of the project, not published.
 docs/
-.claude
 
 # Acer's own NitroSense installer and anything extracted from it. Kept locally
 # for reverse engineering the WMI interface; theirs, not ours to redistribute.
@@ -37,3 +43,10 @@ acer-turbo/
 # Machine-specific firmware dumps: ACPI tables and EC register captures. Useful
 # while investigating, meaningless on anyone else's laptop.
 acpi/
+*.dsl
+*.dat
+ec-dump-*.txt
+
+# Raw screen captures. Only the curated set in screenshots/ is published.
+app-screenshots/
+Screenshot from *.png
