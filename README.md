@@ -55,7 +55,7 @@ desktop can see. Both are covered in `patches/` for the AN515-45.
 | ⚡ Power modes (Quiet / Balanced / Performance) | works |
 | 🔋 Battery limit at 80% | works |
 | 🔌 USB charging while the lid is shut | works |
-| ⌨️ Keyboard lighting, 5 effects and off | works |
+| ⌨️ Keyboard RGB, per zone and 6 effects | works |
 | 💾 Lighting comes back after a reboot | works |
 | 🌡️ Live temps, fan RPM, CPU and GPU usage | works |
 | 🎹 NitroSense key opens the app | works |
@@ -69,13 +69,6 @@ The app shows them as unavailable instead of pretending.
   it. Power modes use the CPU governor instead, which does work.
 - **LCD override.** Writes report success, the value never changes.
 - **Boot animation and sound.** The firmware refuses both reading and writing.
-- **A fixed colour of your choosing.** The six effects work, but there is no
-  static colour. Mode 0, which every other implementation calls Static, is
-  really off: the firmware writes it straight into the EC's KBLE register and
-  0 means the backlight is off. All 256 values were swept and only 1 to 5
-  light, all of them animations. Per-zone colours do reach the hardware, they
-  are just never displayed by anything. The same bug is open upstream for the
-  AN515-58. Details and everything ruled out are in `docs-rgb-findings.md`.
 - **Reading the Fn brightness level.** Fn+F9 and Fn+F10 work, they are handled
   in the embedded controller. But the controller does not tell the firmware,
   and the firmware is all the driver can read, so the number in the app is the
@@ -175,10 +168,14 @@ Full build, test, release and cleanup steps are in [BUILDING.md](BUILDING.md).
 
 ## 🔦 Keyboard stuck dark?
 
-If the lighting goes off and stays off, even after a reboot, the EC has handed
-control to software and nothing gave it back. A flag called PSEE decides who
-owns the lighting, every Linux driver for this hardware sets it on the first
-write, and none of them clear it.
+This should not happen any more. The usual cause was the driver never
+switching the keyboard panel on, so every colour write was accepted and lit
+nothing, and it is fixed in `patches/`. If you are on an older build, or
+another Nitro model that still does it, here is the way out.
+
+The EC hands the lighting to software on the first write, through a flag
+called PSEE, and nothing ever gives it back. That is why the dark survives a
+reboot.
 
 Two ways out. The simple one, no tools:
 

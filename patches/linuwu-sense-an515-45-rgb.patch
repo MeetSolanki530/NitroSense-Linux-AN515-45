@@ -44,7 +44,43 @@
           .ident = "Acer Nitro AN515-46",
           .matches = {
               DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
-@@ -4008,7 +4029,11 @@
+@@ -4004,11 +4025,47 @@
+     u8 gmOutput[15];
+ } __packed;
+ 
++/* Wake the four-zone panel up. Without this it accepts every colour write and
++ * lights nothing, which is what made static look broken on AN515-45: writes
++ * succeeded at every layer, the colours landed correctly in the EC's
++ * KB1R..KB4B registers, and the keyboard stayed dark.
++ *
++ * Two calls, both taken from facer, which is the one driver known to light
++ * this model:
++ *
++ *   GetGamingSysInfo, apparently required before the panel will respond.
++ *   facer's comment says the same, for AN515-57.
++ *
++ *   SetGamingLED with 8 | (15 << 40). Byte 0 is ACER_GAMING_KBL_SET_ON, BIT(3)
++ *   in the mainline acer-wmi RFC, and bits 40 to 43 are the zone mask, its
++ *   ACER_GAMING_KBL_SET_ALL_ZONES. Both halves matter: sending the 15 in byte
++ *   1 rather than byte 5 is accepted and does nothing.
++ *
++ * Called from probe and again before every user-initiated write, because the
++ * panel can be handed back to the EC in between — clearing PSEE does that, and
++ * so does a power cycle. It is two WMI calls and idempotent.
++ *
++ * Return values are ignored on purpose: a model that does not implement these
++ * should still get its sysfs files.
++ */
++static void enable_four_zone_kb(void)
++{
++    u64 sysinfo = 0;
++
++    WMI_gaming_execute_u64(ACER_WMID_GET_GAMING_SYS_INFO_METHODID, 0, &sysinfo);
++    WMI_gaming_execute_u64(ACER_WMID_SET_GAMING_LED_METHODID,
++                           8ULL | (15ULL << 40), NULL);
++}
++
+ static acpi_status set_kb_status(int mode, int speed, int brightness,
                                   int direction, int red, int green, int blue)
  {
      u64 resp = 0;
@@ -57,7 +93,7 @@
  
      acpi_status status;
      union acpi_object *obj;
-@@ -4186,41 +4211,18 @@
+@@ -4186,43 +4243,25 @@
          return -EINVAL;
      }
  
@@ -68,17 +104,17 @@
 +     * breath at speed 0 parks at the dark end of its cycle, a neon at
 +     * rgb 0,0,0 is black. Passing every field through lights all five effects.
 +     *
-+     * Mode 0 keeps its zeroing because it is off, not static, so the other
-+     * fields are meaningless there. */
++     * Static keeps its zeroing, which is correct for it and is what facer
++     * sends for static too. */
 +    if (mode == 0x0)
      {
 -    case 0x0: // Static mode: Ignore speed and direction
-         speed = 0;
-         direction = 0;
--        break;
--    case 0x1: // Breathing mode: Ignore speed
 -        speed = 0;
 -        direction = 0;
+-        break;
+-    case 0x1: // Breathing mode: Ignore speed
+         speed = 0;
+         direction = 0;
 -        break;
 -    case 0x2: // Neon mode: Ignore red, green, blue, and direction
 -        red = 0;
@@ -107,8 +143,15 @@
 -        return -EINVAL;
      }
  
++    /* Same reasoning as the per-zone store: the panel may have been handed
++     * back to the EC since the last write, and an effect into a disabled
++     * panel is accepted and lights nothing. */
++    enable_four_zone_kb();
++
      status = set_kb_status(mode, speed, brightness, direction, red, green, blue);
-@@ -4268,30 +4270,72 @@
+     if (ACPI_FAILURE(status))
+     {
+@@ -4268,30 +4307,68 @@
      return AE_OK;
  }
  
@@ -140,15 +183,32 @@
 +    u64 zones[] = {input->zone1, input->zone2, input->zone3, input->zone4};
      u8 zone_ids[] = {0x1, 0x2, 0x4, 0x8};
  
--    status = set_kb_status(0, 0, input->brightness, 0, 0, 0, 0);
--    if (ACPI_FAILURE(status))
--    {
--        pr_err("Error setting KB status.\n");
++    /* ORDER IS LOAD-BEARING: mode switch first, zone colours last.
++     *
++     * set_kb_status(0, ...) writes KBLE = 0, which switches the backlight off.
++     * The zone writes are what light it again, so they have to come after. If
++     * the colours go first, this call lands last and the keyboard goes dark
++     * with the colours sitting correctly in KB1R..KB4B, unread.
++     *
++     * That is what a reversal of this order did on AN515-45: static appeared
++     * to stop working entirely, the Fn brightness keys looked dead with it,
++     * and it survived reboots because this call also sets PSEE, which hands
++     * the lighting from the EC to software and is never cleared again.
++     *
++     * Both halves matter. Upstream has this order but sends the zone colours
++     * as an 8-byte u64, which this firmware ignores; the 4-byte form below is
++     * what makes them land. Upstream order plus the 4-byte payload is the
++     * combination that works, and it is easy to break by changing either one
++     * on its own.
++     */
+     status = set_kb_status(0, 0, input->brightness, 0, 0, 0, 0);
+     if (ACPI_FAILURE(status))
+     {
+         pr_err("Error setting KB status.\n");
 -        return -ENODEV;
--    }
--
-+    /* Colours first, then the mode switch. The reverse order leaves the
-+     * panel on the previous effect until the next write. */
++        return status;
+     }
+ 
      for (int i = 0; i < 4; i++)
      {
 -        *zones[i] = (cpu_to_be64(*zones[i]) >> 32) | zone_ids[i];
@@ -162,37 +222,24 @@
          }
      }
 -    /* set per_zone to 1*/
-+
-+    /* WARNING: on AN515-45 this call switches the keyboard OFF.
-+     *
-+     * Mode 0 is not static. The firmware writes byte 0 straight into the EC's
-+     * KBLE register, and KBLE 0 means the backlight is off. Established by
-+     * sweeping all 256 values: only 1 to 5 light, and all five are animations
-+     * reading KBCR/KBCG/KBCB rather than the zone colours set above.
-+     *
-+     * So the zone writes land correctly, confirmed by reading KB1R..KB4B back
-+     * out of the EC, and nothing ever displays them. There is no per-zone
-+     * colour on this model through this interface.
-+     *
-+     * This call also sets PSEE, the flag that takes the lighting away from the
-+     * EC and hands it to software, and nothing here ever gives it back. That
-+     * is why a keyboard that has been blanked once stays blanked across
-+     * reboots: the EC only reclaims it when PSEE is cleared, which needs
-+     * either an EC write or a 30 second power cycle.
-+     *
-+     * Do not "fix" this by passing a colour or reversing the order above.
-+     * Both were tried and changed nothing. See docs-rgb-findings.md.
-+     */
-+    status = set_kb_status(0, 0, input->brightness, 0, 0, 0, 0);
-+    if (ACPI_FAILURE(status))
-+    {
-+        pr_err("Error setting KB status.\n");
-+        return status;
-+    }
  
      current_kb_state.per_zone = 1;
  
-@@ -4485,6 +4529,7 @@
+@@ -4354,6 +4431,13 @@
+         return -EINVAL;
+     }
+ 
++    /* Enable first, every time. Probe does this too, but the panel can be
++     * handed back to the EC afterwards — clearing PSEE does it, and so does a
++     * power cycle — and a write into a panel that is not enabled is accepted
++     * and lights nothing. Two WMI calls is a cheap price for never being in
++     * that state. */
++    enable_four_zone_kb();
++
+     /* set per zone colors */
+     status = set_per_zone_color(&colors);
+     if (ACPI_FAILURE(status))
+@@ -4485,6 +4569,7 @@
  /* Four Zoned Keyboard Attributes */
  static struct device_attribute four_zoned_rgb_mode = __ATTR(four_zone_mode, 0644, four_zoned_rgb_kb_show, four_zoned_rgb_kb_store);
  static struct device_attribute per_zoned_rgb_mode = __ATTR(per_zone_mode, 0644, per_zoned_rgb_kb_show, per_zoned_rgb_kb_store);
@@ -200,3 +247,13 @@
  static struct attribute *four_zoned_kb_attrs[] = {
      &four_zoned_rgb_mode.attr,
      &per_zoned_rgb_mode.attr,
+@@ -4555,6 +4640,9 @@
+     }
+ 
+     if(quirks->four_zone_kb || enable_all){
++        /* Enable before the sysfs files exist, so nothing can write into a
++         * panel that has not been switched on yet. */
++        enable_four_zone_kb();
+         err = sysfs_create_group(&device->dev.kobj, &four_zoned_kb_attr_group);
+         if (err)
+             goto error_four_zone;

@@ -182,19 +182,17 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
    * single colour picker, which still gives it a working Static.
    */
   /**
-   * Always false now: per-zone colour is not offered.
+   * Whether Static is being driven through the per-zone write.
    *
-   * The colours reach the hardware correctly, verified by reading the EC's
-   * KB1R..KB4B registers back, but nothing on AN515-45 ever displays them.
-   * Every effect reads the single KBCR/KBCG/KBCB colour instead, and the one
-   * state that could show zones, the EC driving the panel itself, ignores
-   * those registers and lights its own hardcoded red.
+   * Static is the one effect where four separate colours are meaningful, so
+   * it gets the zone pickers and writes per_zone_mode. That is also what the
+   * firmware does: a per-zone write leaves four_zone_mode reporting 0, which
+   * is Static, so the two agree rather than being two names for one state.
    *
-   * Kept as a flag rather than deleted because the wiring is still here and
-   * correct: a model that does display zones only needs this to become a
-   * capability check again. See docs-rgb-findings.md.
+   * A machine that exposes effects but not per_zone_mode falls back to the
+   * single colour picker, which still gives it a working Static.
    */
-  const perZoneColours = false;
+  const perZoneColours = fourZone.mode === 0 && perZoneGate.ok;
 
   // The effect tiles need four_zone_mode, so that is what gates the block.
   // Where only per-zone exists there are no effects to offer, but its colours

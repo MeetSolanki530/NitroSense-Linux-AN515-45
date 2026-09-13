@@ -28,9 +28,11 @@ ns-extract/
 *.resources
 
 # Reference checkouts and a worktree of an earlier commit, used for comparing
-# behaviour against this one while debugging.
+# behaviour against this one while debugging. acer-turbo is facer, whose
+# enable sequence the RGB patch is based on; it has its own upstream.
 ref-dmm/
 yesterday/
+acer-turbo/
 
 # Machine-specific firmware dumps: ACPI tables and EC register captures. Useful
 # while investigating, meaningless on anyone else's laptop.

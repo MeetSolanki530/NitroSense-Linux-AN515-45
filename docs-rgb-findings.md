@@ -1,8 +1,34 @@
-# Static lighting on AN515-45: what is known
+# Static lighting on AN515-45: solved
 
-Working notes. Static (mode 0) and per-zone colour do not light the keyboard.
-Every animated effect does. This records what has been ruled out so the next
-attempt does not repeat it.
+**The answer: the panel has to be switched on first.**
+
+Two WMI calls at driver load, which Linuwu-Sense never made and facer does:
+
+```c
+WMI_gaming_execute_u64(ACER_WMID_GET_GAMING_SYS_INFO_METHODID, 0, &sysinfo);
+WMI_gaming_execute_u64(ACER_WMID_SET_GAMING_LED_METHODID, 8ULL | (15ULL << 40), NULL);
+```
+
+Byte 0 is `ACER_GAMING_KBL_SET_ON`, `BIT(3)` in the mainline acer-wmi RFC.
+Bits 40 to 43 are the zone mask, its `ACER_GAMING_KBL_SET_ALL_ZONES`. Both
+halves matter: the 15 in byte 1 rather than byte 5 is accepted and does
+nothing, which is how it was missed while probing.
+
+Without these, every colour write succeeds at every layer, the colours land
+correctly in the EC's `KB1R..KB4B` registers, `dmesg` is silent, and the
+keyboard stays dark. Nothing about the payload is wrong; the panel was never
+enabled.
+
+Confirmed on AN515-45: static green, and four independent zone colours.
+
+The rest of this file is what was ruled out on the way, kept so the same
+ground is not covered twice. Note that almost all of it was testing payload
+variations against a panel that was switched off, so a negative result there
+means less than it appears.
+
+---
+
+## Original notes
 
 ## The hardware supports it
 

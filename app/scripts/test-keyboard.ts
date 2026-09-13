@@ -53,16 +53,14 @@ check('rejects too few fields', parseFourZone('0,5,50') === null);
 check('rejects non-numeric fields', parseFourZone('a,b,c,d,e,f,g') === null);
 
 console.log('\n4. Effect semantics (what the firmware honours)');
-// Six entries: Off plus five effects. Established by sweeping all 256 mode
-// values on AN515-45 rather than copied from another driver.
-check('off plus five effects are exposed', EFFECTS.length === 6);
-check('mode 0 is Off, not Static', EFFECTS[0]?.name === 'Off');
-// Writing 6,5,100,1,255,255,255 is accepted and lights nothing, so it must
-// not be offered. It was briefly added on a misread sweep result.
-check('mode 6 is not offered; it does not light',
+check('six effects are exposed', EFFECTS.length === 6);
+check('mode 0 is Static', EFFECTS[0]?.name === 'Static');
+// Modes 6 and 7 are in the driver's switch but the firmware never implemented
+// them: writing either is accepted and lights nothing.
+check('mode 6 is not offered; the firmware does not implement it',
   !EFFECTS.some((e) => e.mode === 6));
-check('Off takes no colour', usesColour(0) === false);
-check('Off takes no speed', usesAnimation(0) === false);
+check('Static uses colour', usesColour(0) === true);
+check('Static ignores speed', usesAnimation(0) === false);
 check('mode 5 is Zoom', EFFECTS[5]?.name === 'Zoom');
 check('Breathing uses speed', usesAnimation(1) === true);
 check('Neon uses speed', usesAnimation(2) === true);
@@ -91,8 +89,7 @@ check('Shifting uses speed', usesAnimation(4) === true);
 const blackStatic = { mode: 0, speed: 0, brightness: 100, direction: 1,
                       red: 0, green: 0, blue: 0 };
 
-// Off takes no colour, so there is nothing to rescue there.
-check('Off is left alone by the colour guard', withUsableColour(blackStatic).red === 0);
+check('black Static gets a usable colour', withUsableColour(blackStatic).red === 255);
 check('black Breathing gets a usable colour',
   withUsableColour({ ...blackStatic, mode: 1 }).red === 255);
 check('black Shifting gets a usable colour',
@@ -123,7 +120,7 @@ check('after an effect, both speed and colour are rescued',
 
 check('Wave uses direction', usesDirection(3) === true);
 check('Shifting uses direction', usesDirection(4) === true);
-check('Off does not use direction', usesDirection(0) === false);
+check('Static does not use direction', usesDirection(0) === false);
 check('Breathing does not use direction', usesDirection(1) === false);
 check('Zoom does not use direction', usesDirection(5) === false);
 
@@ -131,7 +128,7 @@ check('Neon discards colour', usesColour(2) === false);
 check('Wave discards colour', usesColour(3) === false);
 check('Zoom uses colour', usesColour(5) === true);
 check('Shifting uses colour', usesColour(4) === true);
-check('unknown mode falls back to the first entry', effectFor(99).name === 'Off');
+check('unknown mode falls back to Static', effectFor(99).name === 'Static');
 
 // The preview draws one lighting state from two reads, and only one of them
 // describes the hardware at a time. Getting this wrong is what made a keyboard
@@ -146,14 +143,13 @@ const zonesRGBY = {
 const staticFZ = { mode: 0, speed: 0, brightness: 100, direction: 1,
                    red: 0, green: 0, blue: 0 };
 
-// Mode 0 is off, so the preview must show unlit keys rather than a colour.
-// Showing the per-zone colours here is what made the old preview claim the
-// keyboard was lit while it was actually dark.
+// Static is applied as a per-zone write, so the preview shows the zone colours
+// because that is genuinely what the keyboard is displaying.
 const asOff = describeLighting(zonesRGBY, staticFZ);
-check('off shows unlit keys, not the zone colours',
-  asOff.swatches.every((s) => s === asOff.swatches[0] && !s.includes('ff0000')));
-check('off says so in the caption', asOff.caption.toLowerCase().includes('off'));
-check('off has no glow', asOff.glows.every((g) => g === 'transparent'));
+check('static shows the four zone colours',
+  asOff.swatches.join() === '#ff0000,#00ff00,#0000ff,#ffff00');
+check('static takes per-zone brightness', asOff.brightness === 60);
+check('static glow matches its swatch', asOff.glows[0] === '#ff0000');
 
 // Breathing blue, while per-zone still reports the stale red/green/blue/yellow.
 const breathing = describeLighting(zonesRGBY,

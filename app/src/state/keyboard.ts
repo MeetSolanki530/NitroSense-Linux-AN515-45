@@ -7,26 +7,18 @@
  *                   zones are 6-digit hex without a leading #
  *   four_zone_mode  "mode,speed,brightness,direction,red,green,blue"
  *
- * The mode numbers were established by sweeping all 256 values on AN515-45
- * hardware, not taken from another implementation:
+ * Acer's WMI interface implements six effects:
+ *   0 Static, 1 Breathing, 2 Neon, 3 Wave, 4 Shifting, 5 Zoom.
  *
- *   0        off
- *   1 to 5   Breathing, Neon, Wave, Shifting, Zoom
- *   6 to 255 nothing, the keyboard stays dark
+ * Modes 6 and 7 exist in the driver's switch but the firmware never
+ * implemented them: writing either is accepted and leaves the keyboard dark.
+ * Confirmed on AN515-45, and every independent reverse-engineering of this
+ * interface stops at 5.
  *
- * Mode 6 was briefly added on a misread of a sweep result and taken back out:
- * writing 6,5,100,1,255,255,255 is accepted and lights nothing.
- *
- * Mode 0 is off, not static. The firmware writes byte 0 of the payload
- * straight into the EC's KBLE register with no validation, and KBLE 0
- * switches the backlight off. Calling it Static, which every other
- * implementation does, produced an app that turned the keyboard off when the
- * user asked for a fixed colour.
- *
- * per_zone_mode writes land correctly in the EC's KB1R..KB4B registers, but
- * no mode displays them: every effect reads KBCR/KBCG/KBCB instead. So there
- * is no per-zone colour on this model through this interface. See
- * docs-rgb-findings.md.
+ * Static and the per-zone colours only work once the panel has been enabled,
+ * which takes two WMI calls at driver load that Linuwu-Sense never made. See
+ * enable_four_zone_kb() in the driver patch. Without them every colour write
+ * is accepted and nothing lights, which looks exactly like a dead mode 0.
  */
 
 /** Mid-range, matching what the effect tiles start on. */
@@ -79,8 +71,8 @@ export type Effect = {
  * them; the effects use KBCR/KBCG/KBCB instead. See docs-rgb-findings.md.
  */
 export const EFFECTS: Effect[] = [
-  { mode: 0, name: 'Off', usesColour: false, usesSpeed: false, usesDirection: false,
-    note: 'Switches the keyboard lighting off.' },
+  { mode: 0, name: 'Static', usesColour: true, usesSpeed: false, usesDirection: false,
+    note: 'A fixed colour. Speed and direction do not apply.' },
   { mode: 1, name: 'Breathing', usesColour: true, usesSpeed: true, usesDirection: false,
     note: 'Pulses the colour on and off. Speed sets the rate.' },
   { mode: 2, name: 'Neon', usesColour: false, usesSpeed: true, usesDirection: false,
@@ -250,13 +242,15 @@ export function describeLighting(perZone: PerZone, fourZone: FourZone): Lighting
   const effect = effectFor(fourZone.mode);
 
   // Mode 0 is off, so the preview shows unlit keys rather than a colour.
+  // Static shows the four zone colours, because that is what the hardware is
+  // displaying: a per-zone write is how Static is applied.
   if (fourZone.mode === 0) {
-    const dark = '#15100c';
+    const zones = perZone.zones.map((hex) => `#${hex}`) as LightingPreview['swatches'];
     return {
-      swatches: [dark, dark, dark, dark],
-      glows: ['transparent', 'transparent', 'transparent', 'transparent'],
-      brightness: 100,
-      caption: 'Lighting is off.',
+      swatches: zones,
+      glows: [...zones] as LightingPreview['glows'],
+      brightness: perZone.brightness,
+      caption: 'Per-zone colours. Indicative only, not a live capture of the keyboard.',
     };
   }
 
