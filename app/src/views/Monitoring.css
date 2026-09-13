@@ -60,3 +60,38 @@
 }
 .sensor-value { font-size: 18px; font-weight: 700; color: var(--accent-bright); }
 .sensor-note { font-size: 10px; }
+
+/* ---- machine facts ----
+   Not live readings, so deliberately quieter than the sensor tiles above:
+   no chamfer, no accent hairline, muted values. They sit on a rule under the
+   grid so they read as a footnote to it rather than as more of it. */
+.sensor-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 34px;
+  margin-top: 18px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border);
+}
+.sensor-fact {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.sensor-fact-wide { flex: 1; min-width: 200px; }
+.sensor-fact-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.sensor-fact-value {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

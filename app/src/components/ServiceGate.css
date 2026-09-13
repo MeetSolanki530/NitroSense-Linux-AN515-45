@@ -1,0 +1,148 @@
+.gate {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 32px 24px;
+}
+
+.gate-card {
+  width: min(470px, 100%);
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 36px 34px 30px;
+  clip-path: var(--panel-clip);
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--accent) 6%, var(--bg-panel)) 0%,
+    var(--bg-panel) 42%,
+    color-mix(in srgb, #000 26%, var(--bg-panel)) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent),
+    inset 0 -40px 50px -40px rgba(0, 0, 0, 0.7);
+}
+
+.gate-mark svg {
+  fill: var(--accent);
+  filter: drop-shadow(0 0 20px color-mix(in srgb, var(--accent) 50%, transparent));
+}
+
+/* The waiting state, while the first connection is still in flight. A breathing
+   glow rather than a spinner: there is no progress to report, and a spinner
+   implies there is. */
+.gate-card-quiet {
+  gap: 18px;
+  padding: 40px 34px;
+}
+.gate-mark.is-waiting { animation: gate-breathe 1.9s ease-in-out infinite; }
+@keyframes gate-breathe {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gate-mark.is-waiting { animation: none; opacity: 0.85; }
+}
+
+.gate-title {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.gate-body {
+  margin: 0;
+  max-width: 38ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.gate-error {
+  margin: 0;
+  padding: 8px 13px;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--danger) 75%, var(--text));
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  border-radius: var(--radius);
+}
+
+.gate-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Both are real buttons, and both use the panel chamfer so they belong to the
+   same family as everything else. Quit was an underlined link, which read as
+   an afterthought next to a filled button. */
+.gate-primary,
+.gate-secondary {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 12px 26px;
+  min-width: 132px;
+  cursor: pointer;
+  clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
+  transition: filter 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.gate-primary {
+  border: none;
+  color: #fff;
+  background: linear-gradient(140deg, var(--accent-bright), var(--accent) 70%);
+  box-shadow: var(--glow-strong);
+}
+.gate-primary:hover:not(:disabled) { filter: brightness(1.14); }
+
+/* Quit is the destructive-ish choice, so it is outlined rather than filled and
+   only picks up colour on hover. */
+.gate-secondary {
+  border: 1px solid var(--border-strong);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-muted);
+}
+.gate-secondary:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.gate-primary:disabled,
+.gate-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  box-shadow: none;
+  filter: none;
+}
+
+.gate-hint {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+.gate-hint code {
+  display: block;
+  margin-top: 5px;
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 5px 9px;
+  user-select: text;
+}

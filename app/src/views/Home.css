@@ -60,10 +60,20 @@
   width: 100%;
 }
 
-.home-sparks { display: flex; gap: 18px; width: 100%; justify-content: center; }
+/* Three across now, so they share the width evenly rather than each taking
+   their intrinsic size and overflowing the panel. */
+.home-sparks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
 
-.sparkline { display: grid; justify-items: center; gap: 2px; }
+.sparkline { display: grid; justify-items: center; gap: 2px; min-width: 0; }
+/* The svg carries a fixed width attribute for its viewBox; this lets it scale
+   to whatever column it lands in, which matters now there are three. */
 .sparkline svg {
+  width: 100%;
   border-bottom: 1px solid var(--border);
   opacity: 0.95;
 }
@@ -94,6 +104,25 @@
   text-overflow: ellipsis;
   max-width: 100%;
 }
+/* The fan line carries a graphic, so it centres rather than sitting on the
+   text baseline, and the number gets the display face like every other
+   reading. */
+/* The other footer lines are centred text; this one is a flex row, so it needs
+   to centre its own contents rather than inheriting text-align. */
+.left-foot-fan {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  /* overflow/ellipsis from .left-foot-item would clip the fan graphic. */
+  overflow: visible;
+}
 
 /* ---------- centre ---------- */
 .home-centre {
@@ -106,15 +135,70 @@
   position: relative;
 }
 
+/* Wordmark.
+ *
+ * Two words, one typeface, carried by weight and tracking rather than colour.
+ * NITRO is heavy and tight with a gradient through the red; SENSE is light and
+ * widely tracked in near-white. The contrast is what makes it read as a mark
+ * rather than as two coloured words, and it survives at any size because none
+ * of it depends on a hairline staying visible.
+ *
+ * A script face was considered and rejected: only Oxanium and Open Sans are
+ * bundled, and a cursive mark would sit badly against a grid of gauges.
+ */
 .wordmark {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.12em;
   font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 32px;
   line-height: 1;
+  padding-bottom: 10px;
 }
-.wordmark-nitro { color: var(--red-bright); }
-.wordmark-sense { color: var(--text); }
+.wordmark-nitro {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  background: linear-gradient(
+    100deg,
+    var(--red-hot) 0%,
+    var(--accent-bright) 45%,
+    var(--accent) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* The gradient replaces the fill, so the glow has to come from a shadow on
+     the element rather than from the text colour. */
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 40%, transparent));
+}
+.wordmark-sense {
+  font-weight: 400;
+  font-size: 0.92em;
+  letter-spacing: 0.3em;
+  /* The tracking adds space after the final letter; pull it back so the mark
+     stays optically centred. */
+  margin-right: -0.3em;
+  color: var(--text);
+  opacity: 0.92;
+}
+
+/* A rule that starts at the accent and fades out, tying the two words together
+   without drawing a box around them. */
+.wordmark::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    color-mix(in srgb, var(--accent) 35%, transparent) 45%,
+    transparent 100%
+  );
+}
 
 .mode-block { display: grid; justify-items: center; gap: 2px; margin-top: 6px; width: 100%; }
 .mode-caption {
@@ -200,34 +284,96 @@
   color: var(--text);
 }
 
-.monitor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.monitor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+
+/* Each cell is a small instrument: a lit top edge, a surface that falls away
+   downward, and a corner cut so it belongs to the same family as the panels.
+   A flat box with a border was the thing making this section look unfinished.
+*/
 .monitor-cell {
+  position: relative;
   display: grid;
   justify-items: center;
-  gap: 1px;
-  padding: 9px 4px;
-  background: var(--bg-raised);
+  gap: 2px;
+  padding: 11px 4px 10px;
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--accent) 7%, var(--bg-raised)) 0%,
+    var(--bg-raised) 45%,
+    color-mix(in srgb, #000 30%, var(--bg-raised)) 100%
+  );
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 3px;
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
 }
+
+/* A hairline along the top in the accent, which is what makes the cell read as
+   powered rather than drawn. */
+.monitor-cell::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 7px;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 20%, transparent) 70%,
+    transparent
+  );
+}
+
 .monitor-label {
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.monitor-value { font-size: 19px; font-weight: 700; color: var(--accent-bright); line-height: 1.1; }
-.monitor-unit { font-size: 9px; color: var(--text-dim); }
+.monitor-value {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.05;
+  text-shadow: 0 0 16px color-mix(in srgb, var(--accent) 50%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.monitor-unit {
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+}
 
+/* align-items: center, not baseline: the fan is a graphic with no baseline of
+   its own, so baseline alignment pushed it up against the cap height and made
+   it look both small and misaligned. */
 .fan-readout {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  margin-top: 12px;
+  align-items: center;
+  margin-top: 14px;
   font-size: 12px;
   color: var(--text-muted);
 }
-.fan-readout .mono-num { font-size: 15px; font-weight: 700; color: var(--text); }
+.fan-readout-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.fan-readout .mono-num {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 40%, transparent);
+}
 .fan-note { font-size: 10.5px; margin: 6px 0 0; line-height: 1.4; }
 
 /* ---------- responsive ---------- */

@@ -11,6 +11,7 @@
  * bad values, but a buggy or compromised renderer should never get that far.
  */
 
+import { execFile } from 'node:child_process';
 import { ipcMain } from 'electron';
 import type { BrowserWindow } from 'electron';
 import { HardwareClient } from './hardware-client.ts';
@@ -59,6 +60,50 @@ const HANDLERS: Record<string, Handler> = {
   getModprobeParameter: async ({ client }) => unwrap(await client.send('get_modprobe_parameter')),
   getTelemetry: async ({ telemetry }) => telemetry.sample(),
   getConnectionState: async ({ client }) => client.state,
+
+  /**
+   * Try the socket again. Used by the screen shown when the service is down,
+   * so a user who has just started it by hand does not have to relaunch.
+   *
+   * Resolves either way: a failure is the expected outcome when the service
+   * is still not there, and the connection state already carries that.
+   */
+  reconnect: async ({ client }) => {
+    await client.connect().catch(() => undefined);
+    return { state: client.state };
+  },
+
+  /**
+   * Start the system service, asking for authorisation through the desktop's
+   * own prompt.
+   *
+   * pkexec rather than sudo: there is no terminal to type a password into, and
+   * pkexec puts the request in front of the user as a dialog they can refuse.
+   * A refusal comes back as a non-zero exit, which is reported rather than
+   * retried.
+   */
+  startService: async () => {
+    const result = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+      execFile(
+        'pkexec',
+        ['systemctl', 'start', 'nitrosense-daemon.service'],
+        { timeout: 30_000 },
+        (err, _stdout, stderr) => {
+          if (!err) return resolve({ ok: true });
+          // 126 is the user dismissing the authorisation dialog, which is a
+          // choice rather than a fault, so it reads differently.
+          const dismissed = (err as { code?: number }).code === 126;
+          resolve({
+            ok: false,
+            error: dismissed
+              ? 'Authorisation was dismissed.'
+              : (stderr.trim() || err.message),
+          });
+        },
+      );
+    });
+    return result;
+  },
 
   // ---- thermal / fan ----
   setThermalProfile: async ({ client }, a) => {

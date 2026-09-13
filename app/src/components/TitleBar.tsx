@@ -12,6 +12,12 @@ type Props = {
   active: string;
   onSelect: (id: string) => void;
   connection: ConnectionState;
+  /**
+   * Hidden while the hardware service is unreachable. Every section behind
+   * these needs it, so navigation would only lead to dead screens. Defaults to
+   * shown so nothing else has to opt in.
+   */
+  showTabs?: boolean;
 };
 
 const CONNECTION_LABEL: Record<ConnectionState, string> = {
@@ -21,7 +27,9 @@ const CONNECTION_LABEL: Record<ConnectionState, string> = {
   reinitializing: 'Reinitializing…',
 };
 
-export function TitleBar({ tabs, active, onSelect, connection }: Props): JSX.Element {
+export function TitleBar({
+  tabs, active, onSelect, connection, showTabs = true,
+}: Props): JSX.Element {
   return (
     <header className="titlebar">
       <div className="titlebar-brand">
@@ -37,8 +45,11 @@ export function TitleBar({ tabs, active, onSelect, connection }: Props): JSX.Ele
         </svg>
       </div>
 
+      {/* The nav element stays in the layout even when empty, so the brand and
+          the status pill keep their positions and the bar does not reflow when
+          the service comes up. */}
       <nav className="titlebar-tabs">
-        {tabs.map((t) => (
+        {showTabs && tabs.map((t) => (
           <button
             key={t.id}
             type="button"

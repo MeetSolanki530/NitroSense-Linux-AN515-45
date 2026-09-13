@@ -23,6 +23,7 @@ export function Monitoring({ telemetry }: Props): JSX.Element {
 
   const cpuUse = useHistory(telemetry?.cpu.usagePct ?? null, 120);
   const gpuUse = useHistory(gpuIdle ? null : (telemetry?.gpu.usagePct ?? null), 120);
+  const igpuUse = useHistory(telemetry?.igpu.usagePct ?? null, 120);
   const ramUse = useHistory(telemetry?.ram.usedPct ?? null, 120);
 
   const ram = telemetry?.ram;
@@ -42,10 +43,13 @@ export function Monitoring({ telemetry }: Props): JSX.Element {
           // meaningful range there.
           autoScale
           series={[
+            // dGPU, not GPU: the integrated chip is on the next line down, and
+            // two series called GPU and iGPU invites reading the first as the
+            // pair of them.
             { label: 'CPU', colour: 'var(--red-bright)', points: cpuTemp },
-            { label: 'GPU', colour: 'var(--accent-bright)', points: gpuTemp },
-            { label: 'iGPU', colour: '#ffc257', points: igpuTemp },
-            { label: 'System', colour: '#8ab4ff', points: sysTemp },
+            { label: 'dGPU', colour: 'var(--accent-bright)', points: gpuTemp },
+            { label: 'iGPU', colour: '#f0a04b', points: igpuTemp },
+            { label: 'System', colour: '#7aa2ff', points: sysTemp },
           ]}
         />
         {gpuIdle && (
@@ -62,8 +66,9 @@ export function Monitoring({ telemetry }: Props): JSX.Element {
           unit="%"
           series={[
             { label: 'CPU', colour: 'var(--red-bright)', points: cpuUse },
-            { label: 'GPU', colour: 'var(--accent-bright)', points: gpuUse },
-            { label: 'RAM', colour: '#8ab4ff', points: ramUse },
+            { label: 'dGPU', colour: 'var(--accent-bright)', points: gpuUse },
+            { label: 'iGPU', colour: '#f0a04b', points: igpuUse },
+            { label: 'RAM', colour: '#7aa2ff', points: ramUse },
           ]}
         />
       </section>
@@ -74,18 +79,19 @@ export function Monitoring({ telemetry }: Props): JSX.Element {
           <Sensor label="CPU temperature" value={telemetry?.cpu.tempC ?? null} unit="°C" />
           <Sensor label="CPU utilisation" value={telemetry?.cpu.usagePct ?? null} unit="%" />
           <Sensor
-            label="GPU temperature"
+            label="dGPU temperature"
             value={gpuIdle ? null : (telemetry?.gpu.tempC ?? null)}
             unit="°C"
             note={gpuIdle ? 'suspended' : undefined}
           />
           <Sensor
-            label="GPU clock"
+            label="dGPU clock"
             value={gpuIdle ? null : (telemetry?.gpu.clockMhz ?? null)}
             unit=" MHz"
             note={gpuIdle ? 'suspended' : undefined}
           />
           <Sensor label="iGPU temperature" value={telemetry?.igpu.tempC ?? null} unit="°C" />
+          <Sensor label="iGPU utilisation" value={telemetry?.igpu.usagePct ?? null} unit="%" />
           <Sensor label="System temperature" value={telemetry?.system.tempC ?? null} unit="°C" />
           <Sensor
             label="CPU fan"
@@ -103,10 +109,32 @@ export function Monitoring({ telemetry }: Props): JSX.Element {
           <Sensor label="Battery" value={telemetry?.battery.percent ?? null} unit="%"
                   note={telemetry?.battery.status ?? undefined} />
         </div>
-        <p className="control-hint dim">
-          Memory: {gib(ram?.totalKb ?? null)} total, {gib(ram?.availableKb ?? null)} available.
-          {telemetry?.gpu.name ? ` GPU: ${telemetry.gpu.name}.` : ''}
-        </p>
+        {/* Facts about the machine rather than live readings, so they get their
+            own strip below the sensor grid instead of being tiles in it. It
+            was a plain sentence, which read as a caption that had wandered in
+            from another document. */}
+        <div className="sensor-facts">
+          <div className="sensor-fact">
+            <span className="sensor-fact-label">Memory installed</span>
+            <span className="sensor-fact-value">{gib(ram?.totalKb ?? null)}</span>
+          </div>
+          <div className="sensor-fact">
+            <span className="sensor-fact-label">Memory available</span>
+            <span className="sensor-fact-value">{gib(ram?.availableKb ?? null)}</span>
+          </div>
+          {telemetry?.igpu.name && (
+            <div className="sensor-fact sensor-fact-wide">
+              <span className="sensor-fact-label">Integrated GPU</span>
+              <span className="sensor-fact-value">{telemetry.igpu.name}</span>
+            </div>
+          )}
+          {telemetry?.gpu.name && (
+            <div className="sensor-fact sensor-fact-wide">
+              <span className="sensor-fact-label">Discrete GPU</span>
+              <span className="sensor-fact-value">{telemetry.gpu.name}</span>
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

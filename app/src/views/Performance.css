@@ -135,11 +135,80 @@
 
 .fan-live {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 10px;
-  margin-top: 20px;
-  padding-top: 16px;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 28px;
+  margin-top: 24px;
+  padding-top: 22px;
   border-top: 1px solid var(--border);
+}
+
+/* The spine: a rule running between the two fans with the temperatures seated
+   on it, so the three elements read as one instrument rather than as a row of
+   unrelated widgets. */
+.fan-live-spine {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 18px;
+}
+
+/* Each half of the rule fades towards the fan it points at, and carries a
+   notch at the inner end so the line terminates deliberately. */
+.fan-spine-line {
+  position: relative;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 45%, transparent)
+  );
+}
+.fan-spine-line:last-child {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 45%, transparent),
+    transparent
+  );
+}
+.fan-spine-line::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 5px;
+  height: 5px;
+  translate: 50% -50%;
+  rotate: 45deg;
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.fan-spine-line:last-child::after {
+  right: auto;
+  left: 0;
+  translate: -50% -50%;
+}
+
+.fan-live-temps {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  text-align: center;
+}
+
+@media (max-width: 860px) {
+  .fan-live {
+    grid-template-columns: 1fr 1fr;
+    justify-items: center;
+    row-gap: 22px;
+  }
+  /* The spine only means anything when it sits between the two fans. Stacked,
+     it becomes a divider above them instead. */
+  .fan-live-spine {
+    grid-column: 1 / -1;
+    order: 1;
+    width: 100%;
+  }
 }
 .readout { display: grid; gap: 2px; }
 .readout-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
@@ -150,9 +219,9 @@
   padding: 10px 13px;
   font-size: 12px;
   line-height: 1.55;
-  color: #ffd08a;
-  background: rgba(255, 166, 30, 0.1);
-  border: 1px solid rgba(255, 166, 30, 0.35);
+  color: color-mix(in srgb, var(--warn) 70%, var(--text));
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
   border-radius: var(--radius);
 }
 .profile-warning code {

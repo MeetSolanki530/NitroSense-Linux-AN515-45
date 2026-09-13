@@ -43,7 +43,7 @@ export function FrequencyDial({
            aria-label={`${label} ${caption} ${value === null ? 'unavailable' : `${value} ${unit}`}`}>
         <defs>
           <linearGradient id="dial-grad" x1="0" y1="1" x2="1" y2="0">
-            <stop offset="0%" stopColor="var(--amber)" />
+            <stop offset="0%" stopColor="var(--red-deep)" />
             <stop offset="100%" stopColor="var(--accent-bright)" />
           </linearGradient>
         </defs>

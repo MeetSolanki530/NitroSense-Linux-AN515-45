@@ -22,9 +22,11 @@
     display: grid; place-content: center; justify-items: center;
     gap: 18px;
     border-radius: 18px;
+    /* Standalone document, so it cannot read the app's tokens. These track
+       tokens.css by hand: neutral black ground, red accent. */
     background:
-      radial-gradient(120% 120% at 50% 0%, #1c100a 0%, #0b0806 55%, #070504 100%);
-    border: 1px solid rgba(255, 106, 0, 0.28);
+      radial-gradient(120% 120% at 50% 0%, #1a0c0c 0%, #08080a 55%, #050506 100%);
+    border: 1px solid rgba(224, 43, 29, 0.3);
     box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
     animation: card-in 260ms ease-out both;
   }
@@ -33,17 +35,34 @@
     to   { opacity: 1; transform: scale(1); }
   }
 
-  .mark { filter: drop-shadow(0 0 18px rgba(255, 106, 0, 0.55)); }
-  .mark path { animation: pulse 1.5s ease-in-out infinite; transform-origin: 50% 50%; }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.55; }
+  .mark { filter: drop-shadow(0 0 20px rgba(224, 43, 29, 0.6)); }
+  /* Breathing glow rather than a fade. Dropping the mark to 55% opacity read
+     as the app struggling to load; a glow that swells reads as alive. */
+  .mark { animation: breathe 2s ease-in-out infinite; }
+  @keyframes breathe {
+    0%, 100% { filter: drop-shadow(0 0 14px rgba(224, 43, 29, 0.45)); }
+    50%      { filter: drop-shadow(0 0 26px rgba(255, 74, 51, 0.75)); }
   }
 
+  /* Same treatment as the in-app wordmark: weight and tracking carry it, not
+     colour. The bundled Oxanium is not loaded in this standalone document, so
+     this uses the system stack and leans harder on the contrast. */
   .name {
-    font: 600 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    letter-spacing: 0.22em; text-transform: uppercase;
-    color: #ff8c2b;
+    display: flex; align-items: baseline; gap: 0.34em;
+    font: 400 14px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    text-transform: uppercase;
+  }
+  .name b {
+    font-weight: 800; letter-spacing: 0.04em;
+    color: #ff4a33;
+    text-shadow: 0 0 16px rgba(224, 43, 29, 0.55);
+  }
+  .name span {
+    font-weight: 300; letter-spacing: 0.42em;
+    /* Tracking adds space after the last letter; pull it back so the pair
+       stays optically centred in the card. */
+    margin-right: -0.42em;
+    color: rgba(255, 255, 255, 0.9);
   }
   .sub {
     margin-top: -8px;
@@ -55,12 +74,15 @@
   /* Indeterminate sweep: we cannot know real progress, so do not imply it. */
   .bar {
     width: 178px; height: 2px; border-radius: 2px;
-    background: rgba(255, 106, 0, 0.15);
+    background: rgba(224, 43, 29, 0.16);
     overflow: hidden;
   }
   .bar i {
     display: block; width: 42%; height: 100%; border-radius: 2px;
-    background: linear-gradient(90deg, #ff6a00, #ff8c2b);
+    /* Fading at both ends, so the sweep reads as light travelling along the
+       track rather than a block sliding across it. */
+    background: linear-gradient(90deg, transparent, #ff4a33 35%, #e02b1d 65%, transparent);
+    box-shadow: 0 0 12px rgba(224, 43, 29, 0.7);
     animation: sweep 1.15s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   }
   @keyframes sweep {
@@ -69,22 +91,24 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .card, .mark path, .bar i { animation: none; }
+    /* .mark, not .mark path: the pulse moved onto the mark itself. */
+    .card, .mark, .bar i { animation: none; }
   }
 </style>
 
 <div class="card">
   <svg class="mark" viewBox="0 0 32 32" width="82" height="82" aria-hidden="true">
     <defs>
-      <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#ff8c2b"/>
-        <stop offset="100%" stop-color="#ff6a00"/>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#ff6a4d"/>
+        <stop offset="55%" stop-color="#ff4a33"/>
+        <stop offset="100%" stop-color="#c62828"/>
       </linearGradient>
     </defs>
     <path d="M6 28 L6 4 L13 4 L13 17 L20 4 L26 4 L26 28 L19 28 L19 14 L12 28 Z" fill="url(#g)"/>
   </svg>
 
-  <div class="name">NitroSense</div>
+  <div class="name"><b>NITRO</b><span>SENSE</span></div>
   <div class="sub">Connecting to hardware</div>
   <div class="bar"><i></i></div>
 </div>

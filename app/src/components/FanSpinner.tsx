@@ -7,7 +7,7 @@
  * is correct straight after a restart with no state to restore: the RPM read
  * is the source of truth, not anything the app remembered.
  */
-import type { JSX } from 'react';
+import { useId, type JSX } from 'react';
 import { fanSpinSeconds } from '../state/fan';
 import './FanSpinner.css';
 
@@ -21,6 +21,9 @@ export function FanSpinner({
 }): JSX.Element {
   const seconds = fanSpinSeconds(rpm);
   const stopped = seconds === null;
+  // Masks are referenced by id, so two spinners on one page would otherwise
+  // share, and the second would be cut by the first's geometry.
+  const maskId = `fan-blades-${useId()}`;
 
   return (
     <span
@@ -34,18 +37,50 @@ export function FanSpinner({
       }
       title={rpm === null || rpm === undefined ? `${label}: no reading` : `${rpm} RPM`}
     >
-      <svg viewBox="0 0 40 40" className="fan-spinner-blades" aria-hidden="true">
-        {/* Five blades, each the same shape rotated about the hub. Drawn as
-            curves rather than straight spokes so the direction of rotation
-            reads at a glance. */}
-        {[0, 72, 144, 216, 288].map((angle) => (
-          <path
-            key={angle}
-            d="M20 20 C 20 11, 25 5, 31 5 C 31 12, 26 18, 20 20 Z"
-            transform={`rotate(${angle} 20 20)`}
-          />
-        ))}
-        <circle cx="20" cy="20" r="4.2" className="fan-spinner-hub" />
+      <svg viewBox="0 0 40 40" aria-hidden="true">
+        {/*
+          A real impeller is very nearly a solid disc: wide blades that overlap,
+          separated by thin slots. Drawing narrow blades with wide gaps between
+          them, which is the obvious way to do it, produces a pinwheel.
+
+          So this is built the other way round. The impeller is one filled disc,
+          and the slots between the blades are cut out of it with a mask. At
+          20 to 34 pixels that reads as a fan; individually stroked blades do
+          not survive at this size.
+        */}
+        <defs>
+          <mask id={maskId}>
+            <circle cx="20" cy="20" r="16" fill="#fff" />
+            {/* Nine slots, swept back from the hub so the blade pitch is
+                visible and the direction of rotation reads. */}
+            {[0, 40, 80, 120, 160, 200, 240, 280, 320].map((angle) => (
+              <path
+                key={angle}
+                d="M20 14.6 Q 24.4 10.4 28.6 7.4"
+                fill="none"
+                stroke="#000"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                transform={`rotate(${angle} 20 20)`}
+              />
+            ))}
+            {/* Bore, so the hub below shows through rather than sitting on a
+                filled centre. */}
+            <circle cx="20" cy="20" r="4.6" fill="#000" />
+          </mask>
+        </defs>
+
+        {/* Static housing, outside the rotating group so it does not spin. */}
+        <circle cx="20" cy="20" r="18.6" className="fan-ring" />
+
+        <g className="fan-spinner-blades">
+          <circle cx="20" cy="20" r="16" className="fan-impeller" mask={`url(#${maskId})`} />
+        </g>
+
+        {/* Hub and spindle stay still: on a real fan the centre boss barely
+            appears to move, and a spinning dot in the middle looks like a toy. */}
+        <circle cx="20" cy="20" r="4.8" className="fan-hub" />
+        <circle cx="20" cy="20" r="1.6" className="fan-bore" />
       </svg>
     </span>
   );

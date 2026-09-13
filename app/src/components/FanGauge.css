@@ -1,0 +1,103 @@
+.fan-gauge {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.fan-gauge-disc {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.fan-gauge-disc svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Housing and grille, both static so they do not spin with the blades. */
+.fan-gauge-housing {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.fan-gauge-grille {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 18%, transparent);
+  stroke-width: 0.8;
+  stroke-dasharray: 2 5;
+}
+
+.fan-gauge-blades {
+  /* Clockwise, matching how these fans are drawn on the chassis. */
+  animation: fan-gauge-turn var(--spin, 1s) linear infinite;
+  transform-origin: 50% 50%;
+}
+.fan-gauge-impeller {
+  fill: var(--accent);
+  opacity: 0.9;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+
+/* The hub carries the number, so it is a solid disc rather than an outline. */
+.fan-gauge-hub {
+  fill: var(--bg-panel-solid);
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke-width: 1.2;
+}
+
+.fan-gauge-readout {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  line-height: 1;
+  pointer-events: none;
+}
+.fan-gauge-rpm {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.fan-gauge-unit {
+  margin-top: 3px;
+  font-size: 8.5px;
+  letter-spacing: 0.2em;
+  color: var(--text-dim);
+}
+
+.fan-gauge-label {
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* A stopped fan looks stopped, not slow: no motion, no glow, colour drops out
+   so it cannot be mistaken for a very slow spin. */
+.fan-gauge.is-stopped .fan-gauge-blades { animation: none; }
+.fan-gauge.is-stopped .fan-gauge-impeller {
+  fill: var(--text-dim);
+  opacity: 0.35;
+  filter: none;
+}
+.fan-gauge.is-stopped .fan-gauge-hub {
+  stroke: color-mix(in srgb, var(--text-dim) 60%, transparent);
+}
+.fan-gauge.is-stopped .fan-gauge-rpm {
+  color: var(--text-muted);
+  text-shadow: none;
+}
+
+@keyframes fan-gauge-turn {
+  to { transform: rotate(360deg); }
+}
+
+/* Continuous motion is a problem for some vestibular conditions, and this one
+   runs forever. The reading is in the hub either way. */
+@media (prefers-reduced-motion: reduce) {
+  .fan-gauge-blades { animation: none; }
+}

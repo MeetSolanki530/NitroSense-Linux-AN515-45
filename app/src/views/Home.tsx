@@ -32,8 +32,26 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
   const gpuUsage = gpu && !gpu.idle ? gpu.usagePct : null;
   const cpuUsage = telemetry?.cpu.usagePct ?? null;
 
+  const igpuUsage = telemetry?.igpu.usagePct ?? null;
+
   const gpuHistory = useHistory(gpuUsage);
+  const igpuHistory = useHistory(igpuUsage);
   const cpuHistory = useHistory(cpuUsage);
+
+  /**
+   * Say which GPU this is.
+   *
+   * A bare "GPU Usage" sitting at 0% invites the conclusion that the reading
+   * is broken. On a laptop with switchable graphics it is usually correct and
+   * uninteresting: the desktop renders on the integrated chip and the discrete
+   * card idles until something is explicitly placed on it. Naming the part
+   * makes a zero read as "the discrete card is asleep" rather than "this
+   * number is stuck".
+   *
+   * Usage only ever comes from nvidia-smi, so this figure is always the
+   * discrete GPU when one is present.
+   */
+  const gpuUsageLabel = gpu?.present ? 'dGPU Usage' : 'GPU Usage';
 
   // The daemon's own thermal_profile is confirmed non-functional on this
   // hardware (see electron/cpupower.ts for the full trace); the real,
@@ -54,7 +72,11 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
             idle={Boolean(gpu?.idle)}
           />
           <div className="home-sparks">
-            <Sparkline history={gpuHistory} label="GPU Usage" value={gpuUsage} />
+            {/* Both GPUs, because on a switchable-graphics laptop the one
+                doing the work is usually the integrated chip. Showing only the
+                discrete card leaves a permanent 0% that looks broken. */}
+            <Sparkline history={gpuHistory} label={gpuUsageLabel} value={gpuUsage} />
+            <Sparkline history={igpuHistory} label="iGPU Usage" value={igpuUsage} />
             <Sparkline history={cpuHistory} label="CPU Usage" value={cpuUsage} />
           </div>
           {/* Real telemetry already fetched for the aside/Monitoring views,
@@ -70,7 +92,7 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
               <span className="left-foot-item" title={gpu.name}>{gpu.name}</span>
             )}
             <span className="left-foot-item mono-num left-foot-fan">
-              <FanSpinner rpm={telemetry?.fans.cpuRpm} size={20} label="CPU fan" />
+              <FanSpinner rpm={telemetry?.fans.cpuRpm} size={28} label="CPU fan" />
               Fan{' '}
               {telemetry?.fans.cpuRpm === null || telemetry === null ? (
                 <span className="dim">--</span>
@@ -137,8 +159,16 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
         <section className="panel widget">
           <h2 className="panel-title">Monitoring</h2>
           <div className="monitor-grid">
-            <Cell label="GPU" value={gpuUsage} unit="%" />
-            <Cell label="GPU" value={gpu?.idle ? null : (gpu?.tempC ?? null)} unit="°C" />
+            {/* Both of these were labelled "GPU", which left two cells in the
+                same grid claiming to be the same thing. They are the discrete
+                card; the integrated one has its own temperature on the
+                Monitoring tab. */}
+            <Cell label={gpu?.present ? 'dGPU' : 'GPU'} value={gpuUsage} unit="%" />
+            <Cell
+              label={gpu?.present ? 'dGPU' : 'GPU'}
+              value={gpu?.idle ? null : (gpu?.tempC ?? null)}
+              unit="°C"
+            />
             <Cell label="CPU" value={cpuUsage} unit="%" />
             <Cell label="CPU" value={telemetry?.cpu.tempC ?? null} unit="°C" />
             <Cell label="System" value={telemetry?.system.tempC ?? null} unit="°C" />
@@ -147,7 +177,7 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
           <div className="hatch" style={{ marginTop: 14 }} />
           <div className="fan-readout">
             <span className="fan-readout-label">
-              <FanSpinner rpm={telemetry?.fans.cpuRpm} size={26} label="CPU fan" />
+              <FanSpinner rpm={telemetry?.fans.cpuRpm} size={34} label="CPU fan" />
               Fan
             </span>
             <span className="mono-num">

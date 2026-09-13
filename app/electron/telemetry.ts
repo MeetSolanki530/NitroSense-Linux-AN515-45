@@ -47,8 +47,17 @@ export type Telemetry = {
     usagePct: Reading;
     clockMhz: Reading;
   };
-  /** Integrated Radeon GPU (amdgpu). */
-  igpu: { tempC: Reading };
+  /**
+   * Integrated Radeon.
+   *
+   * Utilisation comes from amdgpu's own gpu_busy_percent, a plain sysfs read
+   * with no equivalent of nvidia-smi's cost, so unlike the discrete card there
+   * is no reason to gate it behind a runtime-power check.
+   *
+   * This is the GPU the desktop actually renders on, which is why the discrete
+   * one reads 0% nearly all the time.
+   */
+  igpu: { tempC: Reading; usagePct: Reading; name: string | null };
   system: { tempC: Reading };
   ram: { usedPct: Reading; totalKb: Reading; availableKb: Reading };
   /** Null until linuwu_sense is loaded — it provides the fan hwmon. */
@@ -63,6 +72,9 @@ export type SensorMap = {
   cpuModel: string | null;
   systemTemp: string | null;
   igpuTemp: string | null;
+  igpuBusy: string | null;
+  /** Resolved once at discovery: the name never changes while running. */
+  igpuName: string | null;
   fanInputs: string[];
   batteryDir: string | null;
   acDir: string | null;
@@ -90,6 +102,48 @@ async function readTempC(path: string | null): Promise<Reading> {
   if (!path) return null;
   const milli = await readNumber(path);
   return milli === null ? null : Math.round((milli / 1000) * 10) / 10;
+}
+
+/**
+ * A readable name for the integrated GPU.
+ *
+ * sysfs only carries numeric PCI ids for it — 0x1002:0x1638 here — and there is
+ * no in-kernel name to read, so this shells out to lspci, which owns the
+ * vendor/device database that turns those into "Cezanne [Radeon Vega Series]".
+ *
+ * Done once at discovery rather than per sample: the name cannot change while
+ * the machine is running, and a process spawn on every poll would be absurd.
+ *
+ * Returns null when lspci is absent, which is common on minimal installs. The
+ * caller treats a missing name as "do not show the row" rather than an error.
+ */
+async function readIgpuName(pciSlot: string | null): Promise<string | null> {
+  if (!pciSlot) return null;
+  return new Promise((resolve) => {
+    execFile('lspci', ['-mm', '-s', pciSlot], { timeout: 3_000 }, (err, stdout) => {
+      if (err || !stdout) return resolve(null);
+      // -mm quotes each field: slot "Class" "Vendor" "Device" ...
+      // The third quoted field is the device name, which is the useful one.
+      const fields = stdout.match(/"([^"]*)"/g);
+      const device = fields?.[2]?.replace(/"/g, '').trim();
+      resolve(device && device.length > 0 ? device : null);
+    });
+  });
+}
+
+/**
+ * A percentage that is already a percentage.
+ *
+ * amdgpu's gpu_busy_percent is a whole number 0-100, unlike the millidegree
+ * temperatures beside it, so it needs no scaling — only clamping, because a
+ * driver returning something outside the range should not put a line off the
+ * top of a chart.
+ */
+async function readPercent(path: string | null): Promise<Reading> {
+  if (!path) return null;
+  const n = await readNumber(path);
+  if (n === null) return null;
+  return Math.min(100, Math.max(0, Math.round(n)));
 }
 
 async function listHwmon(): Promise<HwmonDevice[]> {
@@ -160,6 +214,29 @@ export async function discoverSensors(): Promise<SensorMap> {
   const igpuDev = byName('amdgpu');
   const igpuTemp = igpuDev ? await firstExisting([`${igpuDev.path}/temp1_input`]) : null;
 
+  /*
+   * amdgpu's utilisation counter.
+   *
+   * It lives on the DRM device rather than in hwmon, so it is found by walking
+   * the cards and asking each one's driver, instead of by hwmon name. The
+   * hwmon device does sit under the same PCI device, so its path would also
+   * reach it, but that relationship is not guaranteed and the DRM walk is
+   * unambiguous.
+   */
+  let igpuBusy: string | null = null;
+  let igpuSlot: string | null = null;
+  for (const card of ['card0', 'card1', 'card2', 'card3']) {
+    const dev = `/sys/class/drm/${card}/device`;
+    const uevent = await readText(`${dev}/uevent`);
+    if (uevent === null || !uevent.includes('DRIVER=amdgpu')) continue;
+    igpuBusy = await firstExisting([`${dev}/gpu_busy_percent`]);
+    // PCI_SLOT_NAME is in the same uevent, and is how lspci is matched below.
+    igpuSlot = uevent.match(/PCI_SLOT_NAME=(\S+)/)?.[1] ?? null;
+    if (igpuBusy) break;
+  }
+
+  const igpuName = await readIgpuName(igpuSlot);
+
   // Fan RPM: whichever hwmon exposes fan*_input. On Acer hardware this comes
   // from linuwu_sense/acer-wmi, so it is absent until that driver loads.
   const fanInputs: string[] = [];
@@ -199,6 +276,8 @@ export async function discoverSensors(): Promise<SensorMap> {
     cpuModel,
     systemTemp,
     igpuTemp,
+    igpuBusy,
+    igpuName,
     fanInputs,
     batteryDir,
     acDir,
@@ -377,10 +456,11 @@ export class TelemetryPoller extends EventEmitter {
     if (!this.#sensors) await this.rediscover();
     const s = this.#sensors as SensorMap;
 
-    const [cpuTempC, systemTempC, igpuTempC, ram, cpuSample] = await Promise.all([
+    const [cpuTempC, systemTempC, igpuTempC, igpuUsagePct, ram, cpuSample] = await Promise.all([
       readTempC(s.cpuTemp),
       readTempC(s.systemTemp),
       readTempC(s.igpuTemp),
+      readPercent(s.igpuBusy),
       readRam(),
       readCpuSample(),
     ]);
@@ -397,7 +477,7 @@ export class TelemetryPoller extends EventEmitter {
       timestamp: Date.now(),
       cpu: { usagePct, tempC: cpuTempC, model: s.cpuModel },
       gpu,
-      igpu: { tempC: igpuTempC },
+      igpu: { tempC: igpuTempC, usagePct: igpuUsagePct, name: s.igpuName },
       system: { tempC: systemTempC },
       ram,
       fans,

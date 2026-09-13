@@ -12,7 +12,7 @@
 }
 .battery-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--amber), var(--accent-bright));
+  background: linear-gradient(90deg, var(--red-deep), var(--accent-bright));
   box-shadow: var(--glow);
   transition: width 0.4s ease;
 }

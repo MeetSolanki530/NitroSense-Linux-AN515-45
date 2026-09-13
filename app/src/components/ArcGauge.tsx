@@ -41,10 +41,13 @@ export function ArcGauge({
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img"
            aria-label={`${label} ${value === null ? 'unavailable' : `${value}${unit}`}`}>
         <defs>
+          {/* Deep red through to hot, so a full arc looks hotter than a
+              quarter one without changing hue. The old amber-to-orange ramp
+              referenced tokens that no longer exist. */}
           <linearGradient id={gradId} x1="0" y1="1" x2="1" y2="0">
-            <stop offset="0%" stopColor="var(--amber)" />
-            <stop offset="55%" stopColor="var(--orange)" />
-            <stop offset="100%" stopColor="var(--red-bright)" />
+            <stop offset="0%" stopColor="var(--red-deep)" />
+            <stop offset="55%" stopColor="var(--red)" />
+            <stop offset="100%" stopColor="var(--red-hot)" />
           </linearGradient>
         </defs>
 

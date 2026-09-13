@@ -16,7 +16,8 @@ export type Telemetry = {
     present: boolean; idle: boolean; name: string | null;
     tempC: number | null; usagePct: number | null; clockMhz: number | null;
   };
-  igpu: { tempC: number | null };
+  /** Integrated Radeon. Utilisation is amdgpu's own gpu_busy_percent. */
+  igpu: { tempC: number | null; usagePct: number | null; name: string | null };
   system: { tempC: number | null };
   ram: { usedPct: number | null; totalKb: number | null; availableKb: number | null };
   fans: { cpuRpm: number | null; gpuRpm: number | null };
@@ -101,6 +102,8 @@ declare global {
       getSettings(): Promise<Settings>;
       getTelemetry(): Promise<Telemetry>;
       getConnectionState(): Promise<ConnectionState>;
+      reconnect(): Promise<{ state: ConnectionState }>;
+      startService(): Promise<{ ok: boolean; error?: string }>;
       setThermalProfile(profile: string): Promise<unknown>;
       setFanSpeed(cpu: number, gpu: number): Promise<unknown>;
       getPowerState(): Promise<PowerState>;

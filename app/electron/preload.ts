@@ -41,6 +41,8 @@ const api = {
   getModprobeParameter: () => call<Record<string, unknown>>('getModprobeParameter'),
   getTelemetry: () => call<unknown>('getTelemetry'),
   getConnectionState: () => call<string>('getConnectionState'),
+  reconnect: () => call<unknown>('reconnect'),
+  startService: () => call<unknown>('startService'),
 
   // thermal / fan
   setThermalProfile: (profile: string) => call<unknown>('setThermalProfile', { profile }),

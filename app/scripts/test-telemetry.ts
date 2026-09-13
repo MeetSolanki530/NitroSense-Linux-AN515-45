@@ -47,6 +47,19 @@ async function main(): Promise<void> {
   check('fans report null rather than fabricating zero',
     sensors.fanInputs.length > 0 || first.fans.cpuRpm === null);
 
+  // The integrated GPU is the one the desktop actually renders on, so its
+  // utilisation is the figure that moves. It comes from amdgpu's own
+  // gpu_busy_percent, which lives on the DRM device rather than in hwmon.
+  check('found the integrated GPU utilisation counter',
+    sensors.igpuBusy !== null, String(sensors.igpuBusy));
+  check('iGPU utilisation is a percentage, or null where absent',
+    first.igpu.usagePct === null
+    || (first.igpu.usagePct >= 0 && first.igpu.usagePct <= 100),
+    String(first.igpu.usagePct));
+  check('iGPU reports a number when the counter exists',
+    sensors.igpuBusy === null || first.igpu.usagePct !== null,
+    String(first.igpu.usagePct));
+
   console.log('\n3. CPU usage needs two samples');
   const second = await poller.sample();
   check('usage resolves once a delta exists',

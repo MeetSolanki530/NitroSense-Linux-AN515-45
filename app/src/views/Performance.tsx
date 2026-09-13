@@ -18,7 +18,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { ControlBlock, Slider, gateFor, type Gate } from '../components/Control';
-import { FanSpinner } from '../components/FanSpinner';
+import { FanGauge } from '../components/FanGauge';
 import { ModeTile } from '../components/ModeTile';
 import { useCommand, useDebounced, useOptimistic } from '../state/useCommand';
 import { usePowerState } from '../state/hardware';
@@ -249,25 +249,32 @@ export function Performance({
           />
         </div>
 
+        {/* The fans are the subject of this panel, so they get the space and
+            carry their own reading in the hub. The temperatures stay as plain
+            readouts beside them: they are context for the fan speed, not the
+            thing being controlled. */}
+        {/* One fan at each end with the temperatures on a spine between them.
+            The fans are the subject of this panel, so they get the space and
+            carry their own reading in the hub; the temperatures are context
+            for those speeds, so they sit in the middle rather than competing
+            as a fifth and sixth tile in a row. */}
         <div className="fan-live">
-          <Readout
-            label="CPU fan"
-            value={telemetry?.fans.cpuRpm ?? null}
-            unit=" RPM"
-            spin={telemetry?.fans.cpuRpm ?? null}
-          />
-          <Readout
-            label="GPU fan"
-            value={telemetry?.fans.gpuRpm ?? null}
-            unit=" RPM"
-            spin={telemetry?.fans.gpuRpm ?? null}
-          />
-          <Readout label="CPU temp" value={telemetry?.cpu.tempC ?? null} unit="°C" />
-          <Readout
-            label="GPU temp"
-            value={telemetry?.gpu.idle ? null : (telemetry?.gpu.tempC ?? null)}
-            unit="°C"
-          />
+          <FanGauge label="CPU fan" rpm={telemetry?.fans.cpuRpm} size={168} />
+
+          <div className="fan-live-spine">
+            <span className="fan-spine-line" aria-hidden="true" />
+            <div className="fan-live-temps">
+              <Readout label="CPU temp" value={telemetry?.cpu.tempC ?? null} unit="°C" />
+              <Readout
+                label="GPU temp"
+                value={telemetry?.gpu.idle ? null : (telemetry?.gpu.tempC ?? null)}
+                unit="°C"
+              />
+            </div>
+            <span className="fan-spine-line" aria-hidden="true" />
+          </div>
+
+          <FanGauge label="GPU fan" rpm={telemetry?.fans.gpuRpm} size={168} />
         </div>
         {telemetry?.fans.cpuRpm === null && (
           <p className="control-hint dim">
@@ -279,16 +286,13 @@ export function Performance({
   );
 }
 
-function Readout({ label, value, unit, spin }: {
+function Readout({ label, value, unit }: {
   label: string; value: number | null; unit: string;
-  /** Show a fan turning at this RPM beside the number. */
-  spin?: number | null;
 }): JSX.Element {
   return (
     <div className="readout">
       <span className="readout-label">{label}</span>
       <span className="readout-value mono-num">
-        {spin !== undefined && <FanSpinner rpm={spin} size={22} label={label} />}
         {value === null ? <span className="dim">--</span> : `${Math.round(value)}${unit}`}
       </span>
     </div>

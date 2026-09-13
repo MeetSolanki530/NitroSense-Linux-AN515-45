@@ -5,10 +5,12 @@
   letter-spacing: 0.02em;
   border-bottom: 1px solid transparent;
 }
+/* Amber on purpose, even though the app's accent is red: a caution has to read
+   as different from an error, and from the accent it sits next to. */
 .banner-warn {
-  background: rgba(255, 166, 30, 0.12);
-  border-bottom-color: rgba(255, 166, 30, 0.35);
-  color: #ffd08a;
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--warn) 35%, transparent);
+  color: color-mix(in srgb, var(--warn) 70%, var(--text));
 }
 .banner-danger {
   background: rgba(255, 74, 43, 0.12);

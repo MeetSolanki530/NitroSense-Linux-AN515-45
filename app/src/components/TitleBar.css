@@ -30,26 +30,60 @@
   border: none;
   position: relative;
   padding: 0 18px;
+  height: 100%;
   font-family: var(--font-display);
   font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s ease;
+  transition: color 0.18s ease, text-shadow 0.18s ease;
+}
+
+/* A wash rising from the underline, so the active tab feels lit from below
+   rather than merely underlined. Drawn on a pseudo-element at zero opacity so
+   hover and active can cross-fade instead of snapping. */
+.tab::before {
+  content: '';
+  position: absolute;
+  inset: auto 6px 0;
+  height: 60%;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--accent) 22%, transparent),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
 }
 .tab:hover { color: var(--text); }
+.tab:hover::before { opacity: 0.45; }
 
-.tab-active { color: var(--text); }
+.tab-active {
+  color: var(--text);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.tab-active::before { opacity: 1; }
+
+/* The underline itself, brightest in the middle so it reads as a filament
+   rather than a border. */
 .tab-active::after {
   content: '';
   position: absolute;
-  left: 12px;
-  right: 12px;
+  left: 10px;
+  right: 10px;
   bottom: 0;
   height: 2px;
-  background: var(--accent);
-  box-shadow: var(--glow);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-bright) 25%,
+    var(--accent-bright) 75%,
+    transparent
+  );
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 80%, transparent);
 }
 
 .titlebar-right {
