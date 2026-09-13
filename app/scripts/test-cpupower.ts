@@ -5,6 +5,7 @@
  * here — this only checks the mapping itself is correct and internally
  * consistent.
  */
+import { readFileSync } from 'node:fs';
 import { targetFor } from '../electron/cpupower.ts';
 
 let passed = 0;
@@ -56,6 +57,31 @@ console.log('\n6. Balanced matches this hardware\'s own observed real-world defa
 // touched: powersave / balance_performance.
 check('balanced governor matches the untouched default', balanced.governor === 'powersave');
 check('balanced EPP matches the untouched default', balanced.epp === 'balance_performance');
+
+// The daemon keeps its own copy of this table, because it is what puts the
+// mode back at boot: this path applies modes through pkexec, which needs a
+// session to authorise it and there is none before login. Two copies of the
+// same table drift, and the symptom would be a machine that boots into a
+// different mode from the one the app shows. So compare them directly.
+console.log('\n7. The daemon\'s copy of the table still agrees');
+
+const daemonSrc = readFileSync(
+  new URL('../../service/nitrosense-daemon.py', import.meta.url), 'utf8');
+
+const tableMatch = daemonSrc.match(/POWER_MODE_TARGETS = \{([\s\S]*?)\n\}/);
+check('the daemon still has a mode table', tableMatch !== null);
+
+if (tableMatch) {
+  for (const mode of ['quiet', 'balanced', 'performance'] as const) {
+    const row = tableMatch[1]?.match(
+      new RegExp(`"${mode}":\\s*\\{"governor":\\s*"([^"]+)",\\s*"epp":\\s*"([^"]+)"\\}`));
+    const target = targetFor(mode);
+    check(`${mode} governor agrees`, row?.[1] === target.governor,
+      `daemon ${row?.[1]} vs app ${target.governor}`);
+    check(`${mode} EPP agrees`, row?.[2] === target.epp,
+      `daemon ${row?.[2]} vs app ${target.epp}`);
+  }
+}
 
 console.log(`\n${failed === 0 ? '\x1b[32m' : '\x1b[31m'}${passed} passed, ${failed} failed\x1b[0m\n`);
 process.exit(failed === 0 ? 0 : 1);

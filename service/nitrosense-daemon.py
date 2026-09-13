@@ -32,15 +32,37 @@ CONFIG_PATH = "/etc/nitrosense/config.ini"
 PID_FILE = "/var/run/nitrosense.pid"
 MODPROBE_CONFIG_PATH = "/etc/modprobe.d/linuwu-sense.conf"
 
-# Last applied keyboard lighting, reapplied at startup.
+# Settings the hardware does not keep for itself, reapplied at startup.
 #
 # The keyboard controller keeps nothing across a power cycle: every boot it
 # comes back reporting ffffff on all four zones, and the sysfs reads are real
 # firmware queries rather than a cache, so there is no stored value anywhere to
-# recover. Something has to write the colour back, and this is the file it is
-# written back from. /var/lib rather than /etc because it is state the daemon
-# maintains, not configuration a user edits.
-LIGHTING_STATE_PATH = "/var/lib/nitrosense/lighting.json"
+# recover. Fan duty is the same story. Something has to write them back, and
+# this is where they are written back from.
+#
+# /var/lib rather than /etc because it is state the daemon maintains, not
+# configuration a user edits. One file per concern so a corrupt one only
+# costs that one setting.
+STATE_DIR = "/var/lib/nitrosense"
+LIGHTING_STATE_PATH = os.path.join(STATE_DIR, "lighting.json")
+FAN_STATE_PATH = os.path.join(STATE_DIR, "fan.json")
+POWER_STATE_PATH = os.path.join(STATE_DIR, "power.json")
+
+# What each power mode means, as CPU governor and energy performance
+# preference. The kernel resets both to their defaults on every boot, so a
+# mode the user chose is gone unless it is written back.
+#
+# MUST match MODE_TARGETS in app/electron/cpupower.ts, which is what applies
+# the mode while the app is open. scripts/test-cpupower.ts compares the two
+# tables so they cannot drift apart unnoticed. The fan side of a mode is not
+# here because setting a mode also writes fan duty, which fan.json already
+# remembers.
+POWER_MODE_TARGETS = {
+    "quiet":       {"governor": "powersave",   "epp": "power"},
+    "balanced":    {"governor": "powersave",   "epp": "balance_performance"},
+    "performance": {"governor": "performance", "epp": "performance"},
+}
+CPUFREQ_GLOB = "/sys/devices/system/cpu/cpu[0-9]*/cpufreq"
 
 # Acer ENEK5130 HID RGB controller used by newer Nitro/Predator models where
 # linuwu_sense exposes RGB sysfs files but color writes do not affect hardware.
@@ -92,6 +114,33 @@ file_handler = logging.handlers.RotatingFileHandler(
 file_handler.setFormatter(formatter)
 log.addHandler(file_handler)
 
+def _write_state(path: str, payload: Dict) -> None:
+    """Write one state file.
+
+    Never raises. A daemon that dies because it could not write a convenience
+    file is worse than a keyboard that forgets its colour.
+    """
+    try:
+        os.makedirs(STATE_DIR, exist_ok=True)
+        with open(path, 'w') as f:
+            json.dump(payload, f, indent=2)
+    except Exception as e:
+        log.warning(f"Could not save {os.path.basename(path)}: {e}")
+
+
+def _read_state(path: str) -> Optional[Dict]:
+    """Read one state file, or None if it is absent or unreadable."""
+    try:
+        if not os.path.exists(path):
+            return None
+        with open(path) as f:
+            saved = json.load(f)
+    except Exception as e:
+        log.warning(f"Could not read {os.path.basename(path)}: {e}")
+        return None
+    return saved if isinstance(saved, dict) else None
+
+
 def save_lighting(kind: str, values: Dict) -> None:
     """Remember the lighting that was just applied.
 
@@ -100,36 +149,128 @@ def save_lighting(kind: str, values: Dict) -> None:
     would mean the second silently overwriting the first, and which one you got
     would depend on the order they happened to be written in. The last thing
     applied is the thing the user is looking at, so that is what comes back.
-
-    Never raises. A daemon that dies because it could not write a convenience
-    file is worse than a keyboard that forgets its colour.
     """
-    try:
-        os.makedirs(os.path.dirname(LIGHTING_STATE_PATH), exist_ok=True)
-        with open(LIGHTING_STATE_PATH, 'w') as f:
-            json.dump({"kind": kind, "values": values}, f, indent=2)
-    except Exception as e:
-        log.warning(f"Could not save lighting state: {e}")
+    _write_state(LIGHTING_STATE_PATH, {"kind": kind, "values": values})
 
 
 def load_lighting() -> Optional[Dict]:
     """The last applied lighting, or None if there is nothing usable."""
-    try:
-        if not os.path.exists(LIGHTING_STATE_PATH):
-            return None
-        with open(LIGHTING_STATE_PATH) as f:
-            saved = json.load(f)
-    except Exception as e:
-        log.warning(f"Could not read lighting state: {e}")
-        return None
-
-    if not isinstance(saved, dict):
+    saved = _read_state(LIGHTING_STATE_PATH)
+    if not saved:
         return None
     if saved.get("kind") not in ("per_zone", "four_zone"):
         return None
     if not isinstance(saved.get("values"), dict):
         return None
     return saved
+
+
+def save_fan(cpu: int, gpu: int) -> None:
+    """Remember the fan duty that was just applied.
+
+    0,0 is the firmware taking the fans back, which is a real choice and worth
+    restoring like any other: a user who switched back to automatic should not
+    find a manual duty waiting for them after a reboot.
+    """
+    _write_state(FAN_STATE_PATH, {"cpu": cpu, "gpu": gpu})
+
+
+def load_fan() -> Optional[Dict]:
+    """The last applied fan duty, or None if there is nothing usable."""
+    saved = _read_state(FAN_STATE_PATH)
+    if not saved:
+        return None
+    try:
+        cpu, gpu = int(saved["cpu"]), int(saved["gpu"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    # Out of range means a file this version did not write. The setter would
+    # reject it anyway; refusing here keeps the reason in the log.
+    if not (0 <= cpu <= 100 and 0 <= gpu <= 100):
+        log.warning(f"Saved fan duty out of range ({cpu},{gpu}), ignoring it")
+        return None
+    return {"cpu": cpu, "gpu": gpu}
+
+
+def save_power_mode(mode: str) -> None:
+    """Remember the power mode that was just applied."""
+    if mode not in POWER_MODE_TARGETS:
+        log.warning(f"Refusing to save unknown power mode: {mode}")
+        return
+    _write_state(POWER_STATE_PATH, {"mode": mode})
+
+
+def load_power_mode() -> Optional[str]:
+    """The last applied power mode, or None if there is nothing usable."""
+    saved = _read_state(POWER_STATE_PATH)
+    if not saved:
+        return None
+    mode = saved.get("mode")
+    return mode if mode in POWER_MODE_TARGETS else None
+
+
+def apply_power_mode(mode: str) -> bool:
+    """Write a power mode's governor and EPP to every CPU.
+
+    The app applies modes through pkexec, which needs a session and a user to
+    authorise it. Neither exists during boot, so the daemon writes these
+    itself: it already runs as root, which is the whole reason the restore can
+    happen before anyone logs in.
+
+    Partial success counts. energy_performance_preference is absent on
+    non-EPP drivers such as acpi-cpufreq, where the governor alone is the
+    whole setting.
+    """
+    target = POWER_MODE_TARGETS.get(mode)
+    if not target:
+        return False
+
+    policies = sorted(glob.glob(CPUFREQ_GLOB))
+    if not policies:
+        log.warning("No cpufreq policies found; cannot apply a power mode")
+        return False
+
+    wrote = 0
+    for policy in policies:
+        for attr, value in (("scaling_governor", target["governor"]),
+                            ("energy_performance_preference", target["epp"])):
+            path = os.path.join(policy, attr)
+            if not os.path.exists(path):
+                continue
+            try:
+                with open(path, 'w') as f:
+                    f.write(value)
+                wrote += 1
+            except Exception as e:
+                log.warning(f"Could not write {path}: {e}")
+    return wrote > 0
+
+
+def restore_power_mode() -> None:
+    """Put the remembered power mode back."""
+    mode = load_power_mode()
+    if not mode:
+        return
+    if apply_power_mode(mode):
+        log.info(f"Restored power mode {mode}")
+    else:
+        log.warning(f"Could not restore power mode {mode}")
+
+
+def restore_fan(manager) -> None:
+    """Write the remembered fan duty back to the hardware."""
+    saved = load_fan()
+    if not saved:
+        return
+    try:
+        ok = manager.set_fan_speed(saved["cpu"], saved["gpu"])
+    except Exception as e:
+        log.warning(f"Could not restore fan duty: {e}")
+        return
+    if ok:
+        log.info(f"Restored fan duty {saved['cpu']},{saved['gpu']}")
+    else:
+        log.warning("Hardware refused the saved fan duty")
 
 
 def restore_lighting(manager) -> None:
@@ -1348,11 +1489,23 @@ class DaemonServer:
                 cpu = params.get("cpu", 0)
                 gpu = params.get("gpu", 0)
                 success = self.manager.set_fan_speed(cpu, gpu)
+                if success:
+                    save_fan(cpu, gpu)
                 return {
                     "success": success,
                     "data": {"cpu": cpu, "gpu": gpu} if success else None,
                     "error": "Failed to set fan speed" if not success else None
                 }
+
+            elif command == "remember_power_mode":
+                # The app has already applied the mode through pkexec; this
+                # only records it so the daemon can put it back at boot, when
+                # there is no session for pkexec to ask.
+                mode = params.get("mode", "")
+                if mode not in POWER_MODE_TARGETS:
+                    return {"success": False, "error": f"Unknown power mode: {mode}"}
+                save_power_mode(mode)
+                return {"success": True, "data": {"mode": mode}}
 
             elif command == "set_lcd_override":
                 # Check if feature is available
@@ -1693,8 +1846,13 @@ class NitroSenseDaemon:
             log.info(f"Detected features: {features_str}")
 
             # After the features are known, so the setters can refuse cleanly
-            # on a machine where the keyboard is not there at all.
+            # on a machine where the hardware is not there at all.
             restore_lighting(self.manager)
+            restore_fan(self.manager)
+            # Governor and EPP only. The fan duty that came with the mode was
+            # written through set_fan_speed at the time, so fan.json already
+            # holds it and restore_fan above has put it back.
+            restore_power_mode()
 
             return True
         except Exception as e:

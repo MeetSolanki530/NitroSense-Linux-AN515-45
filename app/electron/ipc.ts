@@ -136,6 +136,15 @@ const HANDLERS: Record<string, Handler> = {
       fan = { ok: false, error: (e as Error).message };
     }
 
+    // Tell the daemon which mode this was, so it can put the governor back at
+    // boot. It cannot be applied from here at that point: this path goes
+    // through pkexec, which needs a session to authorise it and there is none
+    // before login. Best-effort, since failing to remember a mode is not a
+    // reason to report that setting it failed.
+    if (cpu.ok) {
+      await client.send('remember_power_mode', { mode }).catch(() => undefined);
+    }
+
     return { mode, cpu, fan };
   },
 
