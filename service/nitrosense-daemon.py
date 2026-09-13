@@ -149,7 +149,16 @@ def save_lighting(kind: str, values: Dict) -> None:
     would mean the second silently overwriting the first, and which one you got
     would depend on the order they happened to be written in. The last thing
     applied is the thing the user is looking at, so that is what comes back.
+
+    Per-zone is never stored. On AN515-45 a per-zone write leaves the keyboard
+    dark: the firmware accepts it, reports success, and lights nothing. Saving
+    that meant replaying it at every boot, so the keyboard came up dark and
+    stayed dark until an effect was applied by hand. A setting that cannot be
+    seen is not worth restoring.
     """
+    if kind == "per_zone":
+        log.info("Not saving per-zone lighting; it does not light on this model")
+        return
     _write_state(LIGHTING_STATE_PATH, {"kind": kind, "values": values})
 
 
@@ -161,6 +170,11 @@ def load_lighting() -> Optional[Dict]:
     if saved.get("kind") not in ("per_zone", "four_zone"):
         return None
     if not isinstance(saved.get("values"), dict):
+        return None
+    # A file written by an earlier version may still hold per-zone. Replaying
+    # it would blank the keyboard, so drop it rather than restore it.
+    if saved["kind"] == "per_zone":
+        log.info("Ignoring saved per-zone lighting; it does not light on this model")
         return None
     return saved
 
