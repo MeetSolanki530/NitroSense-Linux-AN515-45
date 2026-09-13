@@ -95,7 +95,7 @@
      }
  
      status = set_kb_status(mode, speed, brightness, direction, red, green, blue);
-@@ -4246,30 +4244,52 @@
+@@ -4246,30 +4244,63 @@
      return AE_OK;
  }
  
@@ -150,6 +150,17 @@
      }
 -    /* set per_zone to 1*/
 +
++    /* Zeros here on purpose: static mode on this firmware shows the per-zone
++     * colours written above, and the global RGB is ignored.
++     *
++     * Do not "fix" this by passing a colour, and do not reverse the order
++     * above. Both were tried on AN515-45 and neither changed anything,
++     * because the failure they were aimed at is not in this function. Once
++     * this firmware has been driven into an animated mode it stops honouring
++     * mode 0 until a reboot, which another AN515-45 owner reported
++     * independently:
++     * github.com/JafarAkhondali/acer-predator-turbo-and-rgb-keyboard-linux-module/issues/63
++     */
 +    status = set_kb_status(0, 0, input->brightness, 0, 0, 0, 0);
 +    if (ACPI_FAILURE(status))
 +    {
