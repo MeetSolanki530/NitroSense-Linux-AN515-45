@@ -50,3 +50,7 @@ ec-dump-*.txt
 # Raw screen captures. Only the curated set in screenshots/ is published.
 app-screenshots/
 Screenshot from *.png
+
+# Release note drafts. These get pasted into the GitHub release, which is
+# where they live; a second copy in the repo would only drift from it.
+RELEASE-NOTES-*.md
