@@ -164,6 +164,76 @@ export function rgbToHex(red: number, green: number, blue: number): string {
   return `${part(red)}${part(green)}${part(blue)}`;
 }
 
+export type LightingPreview = {
+  /** CSS background for each zone, in order. */
+  swatches: [string, string, string, string];
+  /**
+   * A plain colour per zone for the glow beneath it.
+   *
+   * Separate from `swatches` because a swatch may be a gradient, and a
+   * gradient is not a colour: box-shadow and friends silently ignore one.
+   */
+  glows: [string, string, string, string];
+  brightness: number;
+  caption: string;
+};
+
+/** Shown for effects that generate their own colours, so no single swatch fits. */
+const OWN_COLOURS =
+  'linear-gradient(90deg,#ff0040,#ff8a00,#ffe400,#00d26a,#00b3ff,#7a5cff)';
+
+/**
+ * What the keyboard is actually doing, from the two reads.
+ *
+ * The keyboard has one lighting state but reports it through two files, and
+ * only one of them is meaningful at a time. The mode says which: applying an
+ * effect leaves four_zone_mode reporting that mode, while applying per-zone
+ * colours leaves it reporting 0 (Static). So mode 0 means the per-zone
+ * colours are what is lit, and anything else means the effect is.
+ *
+ * Deriving it from the firmware rather than remembering the last button
+ * clicked means it is still right after a restart, and right when the colour
+ * was changed by something other than this app.
+ */
+export function describeLighting(perZone: PerZone, fourZone: FourZone): LightingPreview {
+  const effect = effectFor(fourZone.mode);
+
+  if (fourZone.mode === 0) {
+    const zones = perZone.zones.map((hex) => `#${hex}`) as LightingPreview['swatches'];
+    return {
+      swatches: zones,
+      glows: [...zones] as LightingPreview['glows'],
+      brightness: perZone.brightness,
+      caption: 'Per-zone colours. Indicative only, not a live capture of the keyboard.',
+    };
+  }
+
+  const detail = [`${effect.name} at speed ${fourZone.speed}`];
+  if (effect.usesDirection) {
+    detail.push(fourZone.direction === 2 ? 'left to right' : 'right to left');
+  }
+
+  if (!effect.usesColour) {
+    // One representative colour from the sweep, since the glow needs a colour
+    // and the effect has no single one.
+    const glow = '#ff8a00';
+    return {
+      swatches: [OWN_COLOURS, OWN_COLOURS, OWN_COLOURS, OWN_COLOURS],
+      glows: [glow, glow, glow, glow],
+      brightness: fourZone.brightness,
+      caption: `${detail.join(', ')}. It cycles its own colours, so this is indicative only.`,
+    };
+  }
+
+  const hex = `#${rgbToHex(fourZone.red, fourZone.green, fourZone.blue)}`;
+  return {
+    swatches: [hex, hex, hex, hex],
+    glows: [hex, hex, hex, hex],
+    brightness: fourZone.brightness,
+    caption: `${detail.join(', ')}. Animation is not shown, only the colour.`,
+  };
+}
+
 export const DEFAULT_PER_ZONE: PerZone = {
   zones: ['ff6a00', 'ff6a00', 'ff6a00', 'ff6a00'],
   brightness: 100,

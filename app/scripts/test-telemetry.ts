@@ -8,6 +8,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { discoverSensors, readGpuState, TelemetryPoller } from '../electron/telemetry.ts';
 import type { SensorMap } from '../electron/telemetry.ts';
+import {
+  FAN_FULL_RPM, FAN_MAX_SECONDS, FAN_MIN_SECONDS, FAN_STOPPED_RPM, fanSpinSeconds,
+} from '../src/state/fan.ts';
 
 let passed = 0;
 let failed = 0;
@@ -83,6 +86,43 @@ async function main(): Promise<void> {
   const again = await poller.rediscover();
   check('rediscover() returns a fresh map', again !== null);
   check('repeated discovery is stable', JSON.stringify(before) === JSON.stringify(again));
+
+  // The fan spinner is a gauge, not a replica: a real fan turns far too fast
+  // to animate honestly, so the mapping has to stay inside a range the eye can
+  // follow while still moving visibly with the RPM.
+  console.log('\nFan spinner timing');
+
+  check('no reading does not spin', fanSpinSeconds(null) === null);
+  check('undefined does not spin', fanSpinSeconds(undefined) === null);
+  check('NaN does not spin', fanSpinSeconds(Number.NaN) === null);
+  check('a stopped fan does not spin', fanSpinSeconds(0) === null);
+  check('below the stop threshold does not spin',
+    fanSpinSeconds(FAN_STOPPED_RPM - 1) === null);
+  check('at the stop threshold it spins', fanSpinSeconds(FAN_STOPPED_RPM) !== null);
+
+  const slow = fanSpinSeconds(1200);
+  const fast = fanSpinSeconds(4200);
+  check('faster RPM means less time per turn',
+    slow !== null && fast !== null && fast < slow,
+    `1200 -> ${slow}s, 4200 -> ${fast}s`);
+
+  check('never faster than the floor',
+    (fanSpinSeconds(99_999) as number) >= FAN_MIN_SECONDS);
+  check('never slower than the ceiling',
+    (fanSpinSeconds(FAN_STOPPED_RPM) as number) <= FAN_MAX_SECONDS);
+  check('past full speed is pinned, not extrapolated',
+    fanSpinSeconds(FAN_FULL_RPM) === fanSpinSeconds(FAN_FULL_RPM * 3));
+
+  // A CSS animation-duration of 0s never advances, so a zero would freeze the
+  // blades while the fan is spinning.
+  check('a spinning fan never gets a zero duration',
+    [150, 900, 2700, 4000, 6000].every((r) => (fanSpinSeconds(r) as number) > 0));
+
+  // The everyday range on this machine is roughly 2000-3600 RPM. If those all
+  // collapsed to one duration the spinner would tell you nothing.
+  const everyday = [2000, 2600, 3200, 3600].map(fanSpinSeconds);
+  check('the everyday range is visibly distinct',
+    new Set(everyday).size === everyday.length, everyday.join(', '));
 
   console.log(`\n${failed === 0 ? '\x1b[32m' : '\x1b[31m'}${passed} passed, ${failed} failed\x1b[0m\n`);
   process.exit(failed === 0 ? 0 : 1);

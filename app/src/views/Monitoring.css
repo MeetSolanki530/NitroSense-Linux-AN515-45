@@ -17,9 +17,16 @@
   flex-direction: column;
   justify-content: space-between;
   font-size: 10px;
-  color: var(--text-dim);
+  /* Full-strength text, not the dim token. These sit over a chart rather than
+     a flat panel, so the dim grey lost against the plotted lines and the grid
+     behind them. */
+  color: var(--text);
   pointer-events: none;
 }
+
+/* Same reasoning for the notes under each chart: they carry the units and the
+   memory totals, which are readings rather than asides. */
+.monitoring .control-hint.dim { color: var(--text); }
 
 .trend-legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 12px; }
 .legend-item {

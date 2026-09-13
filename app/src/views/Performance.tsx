@@ -18,6 +18,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { ControlBlock, Slider, gateFor, type Gate } from '../components/Control';
+import { FanSpinner } from '../components/FanSpinner';
 import { ModeTile } from '../components/ModeTile';
 import { useCommand, useDebounced, useOptimistic } from '../state/useCommand';
 import { usePowerState } from '../state/hardware';
@@ -249,8 +250,18 @@ export function Performance({
         </div>
 
         <div className="fan-live">
-          <Readout label="CPU fan" value={telemetry?.fans.cpuRpm ?? null} unit=" RPM" />
-          <Readout label="GPU fan" value={telemetry?.fans.gpuRpm ?? null} unit=" RPM" />
+          <Readout
+            label="CPU fan"
+            value={telemetry?.fans.cpuRpm ?? null}
+            unit=" RPM"
+            spin={telemetry?.fans.cpuRpm ?? null}
+          />
+          <Readout
+            label="GPU fan"
+            value={telemetry?.fans.gpuRpm ?? null}
+            unit=" RPM"
+            spin={telemetry?.fans.gpuRpm ?? null}
+          />
           <Readout label="CPU temp" value={telemetry?.cpu.tempC ?? null} unit="°C" />
           <Readout
             label="GPU temp"
@@ -268,13 +279,16 @@ export function Performance({
   );
 }
 
-function Readout({ label, value, unit }: {
+function Readout({ label, value, unit, spin }: {
   label: string; value: number | null; unit: string;
+  /** Show a fan turning at this RPM beside the number. */
+  spin?: number | null;
 }): JSX.Element {
   return (
     <div className="readout">
       <span className="readout-label">{label}</span>
       <span className="readout-value mono-num">
+        {spin !== undefined && <FanSpinner rpm={spin} size={22} label={label} />}
         {value === null ? <span className="dim">--</span> : `${Math.round(value)}${unit}`}
       </span>
     </div>

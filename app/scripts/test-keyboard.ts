@@ -5,9 +5,9 @@
  *   four_zone_mode "mode,speed,brightness,direction,red,green,blue"
  */
 import {
-  DEFAULT_EFFECT_SPEED, EFFECTS, effectFor, hexToRgb, normaliseHex,
-  parseFourZone, parsePerZone, rgbToHex, usesAnimation, usesColour,
-  usesDirection, withUsableSpeed,
+  DEFAULT_EFFECT_SPEED, EFFECTS, describeLighting, effectFor, hexToRgb,
+  normaliseHex, parseFourZone, parsePerZone, rgbToHex, usesAnimation,
+  usesColour, usesDirection, withUsableSpeed,
 } from '../src/state/keyboard.ts';
 
 let passed = 0;
@@ -88,6 +88,59 @@ check('Wave discards colour', usesColour(3) === false);
 check('Static uses colour', usesColour(0) === true);
 check('Shifting uses colour', usesColour(4) === true);
 check('unknown mode falls back to Static', effectFor(99).name === 'Static');
+
+// The preview draws one lighting state from two reads, and only one of them
+// describes the hardware at a time. Getting this wrong is what made a keyboard
+// breathing green show as four white blocks: per_zone_mode reports ffffff
+// after any effect write, and the preview drew it unconditionally.
+console.log('\n7. Preview reflects what is actually lit');
+
+const zonesRGBY = {
+  zones: ['ff0000', '00ff00', '0000ff', 'ffff00'] as [string, string, string, string],
+  brightness: 60,
+};
+const staticFZ = { mode: 0, speed: 0, brightness: 100, direction: 1,
+                   red: 0, green: 0, blue: 0 };
+
+const asStatic = describeLighting(zonesRGBY, staticFZ);
+check('static shows the four zone colours',
+  asStatic.swatches.join() === '#ff0000,#00ff00,#0000ff,#ffff00');
+check('static takes per-zone brightness', asStatic.brightness === 60);
+check('static glow matches its swatch', asStatic.glows[0] === '#ff0000');
+
+// Breathing blue, while per-zone still reports the stale red/green/blue/yellow.
+const breathing = describeLighting(zonesRGBY,
+  { mode: 1, speed: 7, brightness: 80, direction: 1, red: 0, green: 0, blue: 255 });
+check('an effect overrides the stale per-zone colours',
+  breathing.swatches.every((s) => s === '#0000ff'));
+check('an effect takes its own brightness', breathing.brightness === 80);
+check('the effect is named in the caption', breathing.caption.startsWith('Breathing at speed 7'));
+check('a non-directional effect omits direction',
+  !breathing.caption.includes('right to left'));
+
+// Neon and Wave generate their own colours, so no single swatch is honest.
+const neon = describeLighting(zonesRGBY,
+  { mode: 2, speed: 4, brightness: 100, direction: 1, red: 255, green: 0, blue: 0 });
+check('an own-colour effect ignores the picked colour',
+  neon.swatches.every((s) => s.startsWith('linear-gradient')));
+check('an own-colour effect still has a plain glow colour',
+  neon.glows.every((g) => /^#[0-9a-f]{6}$/i.test(g)));
+check('an own-colour effect says so', neon.caption.includes('cycles its own colours'));
+
+// A gradient in box-shadow is silently dropped, so glows must never be one.
+check('no glow is ever a gradient',
+  [asStatic, breathing, neon].every((p) => p.glows.every((g) => !g.includes('gradient'))));
+
+const wave = describeLighting(zonesRGBY,
+  { mode: 3, speed: 5, brightness: 100, direction: 2, red: 0, green: 0, blue: 0 });
+check('a directional effect names its direction', wave.caption.includes('left to right'));
+const waveBack = describeLighting(zonesRGBY,
+  { mode: 3, speed: 5, brightness: 100, direction: 1, red: 0, green: 0, blue: 0 });
+check('the other direction reads the other way',
+  waveBack.caption.includes('right to left'));
+
+check('every preview fills exactly four zones',
+  [asStatic, breathing, neon, wave].every((p) => p.swatches.length === 4 && p.glows.length === 4));
 
 console.log(`\n${failed === 0 ? '\x1b[32m' : '\x1b[31m'}${passed} passed, ${failed} failed\x1b[0m\n`);
 process.exit(failed === 0 ? 0 : 1);

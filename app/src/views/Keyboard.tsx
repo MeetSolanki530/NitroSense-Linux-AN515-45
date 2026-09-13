@@ -13,8 +13,8 @@ import { useEffect, useState, type JSX } from 'react';
 import { ControlBlock, Slider, gateFor } from '../components/Control';
 import { useCommand } from '../state/useCommand';
 import {
-  DEFAULT_FOUR_ZONE, DEFAULT_PER_ZONE, DIRECTIONS, EFFECTS, effectFor,
-  hexToRgb, normaliseHex, parseFourZone, parsePerZone, rgbToHex,
+  DEFAULT_FOUR_ZONE, DEFAULT_PER_ZONE, DIRECTIONS, EFFECTS, describeLighting,
+  effectFor, hexToRgb, normaliseHex, parseFourZone, parsePerZone, rgbToHex,
   usesAnimation, usesColour, usesDirection, withUsableSpeed,
 } from '../state/keyboard';
 import type { FourZone, PerZone } from '../state/keyboard';
@@ -135,6 +135,8 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
     setFourZone(fallback ? { ...parsed, ...fallback } : parsed);
   }, [settings?.four_zone_mode, dirty.fourZone, zone1]);
 
+  const preview = describeLighting(perZone, fourZone);
+
   const editZone = (index: number, hex: string): void => {
     setDirty((d) => ({ ...d, perZone: true }));
     setPerZone((p) => {
@@ -167,6 +169,24 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
   const directional = usesDirection(fourZone.mode);
   const coloured = usesColour(fourZone.mode);
 
+  /**
+   * Whether Static is being driven through the per-zone write.
+   *
+   * Static is the one effect where four separate colours are meaningful, so
+   * it gets the zone pickers and writes per_zone_mode. That is also what the
+   * firmware does: a per-zone write leaves four_zone_mode reporting 0, which
+   * is Static, so the two agree rather than being two names for one state.
+   *
+   * A machine that exposes effects but not per_zone_mode falls back to the
+   * single colour picker, which still gives it a working Static.
+   */
+  const perZoneColours = fourZone.mode === 0 && perZoneGate.ok;
+
+  // The effect tiles need four_zone_mode, so that is what gates the block.
+  // Where only per-zone exists there are no effects to offer, but its colours
+  // still work, so fall back to its gate rather than disabling everything.
+  const blockGate = fourZoneGate.ok ? fourZoneGate : perZoneGate;
+
   return (
     <div className="keyboard-view">
       {error && (
@@ -176,94 +196,43 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
         </div>
       )}
 
-      {/* Preview reflects whichever mode was applied most recently; the
-          hardware has one lighting state, not two. */}
+      {/* The hardware has one lighting state, not two, so the preview has to
+          pick which of the two reads describes it. The firmware answers that
+          itself: applying an effect leaves four_zone_mode reporting that
+          mode, and applying per-zone colours leaves it reporting 0. Reading
+          the mode is therefore enough, and it survives a restart, where a
+          remembered "last thing clicked" would not.
+
+          This used to draw perZone.zones unconditionally, which meant a
+          keyboard breathing green was previewed as four white blocks, since
+          per_zone_mode reports ffffff after any effect write. */}
       <section className="panel kb-preview-panel">
         <h2 className="panel-title">Preview</h2>
         <div className="kb-preview" aria-hidden="true">
-          {perZone.zones.map((hex, i) => (
+          {preview.swatches.map((background, i) => (
             <div
               key={i}
               className="kb-zone"
               style={{
-                background: `#${hex}`,
-                opacity: Math.max(0.15, perZone.brightness / 100),
+                background,
+                // Brightness dims the whole zone, floored so a zone at 0 is
+                // still visible as a colour rather than vanishing into the
+                // panel, which would read as "nothing is set".
+                opacity: Math.max(0.18, preview.brightness / 100),
+                ['--zone-glow' as string]: preview.glows[i],
               }}
             >
               <span className="kb-zone-name">{ZONE_NAMES[i]}</span>
             </div>
           ))}
         </div>
-        <p className="control-hint dim">
-          Indicative only: it shows the per-zone colours, not a live capture of the keyboard.
-        </p>
+        <p className="control-hint dim">{preview.caption}</p>
       </section>
 
       <ControlBlock
-        title="Per-Zone Colour"
-        gate={perZoneGate}
-        hint="Sets a fixed colour for each of the four keyboard zones."
-      >
-        <div className="zone-grid">
-          {perZone.zones.map((hex, i) => (
-            <ColourField
-              key={i}
-              label={ZONE_NAMES[i] as string}
-              hex={hex}
-              disabled={!perZoneGate.ok || busy}
-              onChange={(v) => editZone(i, v)}
-            />
-          ))}
-        </div>
-
-        <div className="kb-actions kb-swatches">
-          <span className="zone-label">Quick set</span>
-          {PRESETS.map((p) => (
-            <button
-              key={p.hex}
-              type="button"
-              className="swatch"
-              style={{ background: `#${p.hex}` }}
-              title={p.name}
-              aria-label={`Set every zone to ${p.name}`}
-              disabled={!perZoneGate.ok || busy}
-              onClick={() => {
-                setDirty((d) => ({ ...d, perZone: true }));
-                setPerZone((z) => ({ ...z, zones: [p.hex, p.hex, p.hex, p.hex] }));
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="kb-row">
-          <Slider
-            label="Brightness"
-            value={perZone.brightness}
-            disabled={!perZoneGate.ok}
-            onChange={(v) => {
-              setDirty((d) => ({ ...d, perZone: true }));
-              setPerZone((p) => ({ ...p, brightness: v }));
-            }}
-          />
-        </div>
-
-        <div className="kb-actions">
-          <button
-            type="button"
-            className="apply"
-            disabled={!perZoneGate.ok || busy}
-            onClick={applyPerZone}
-          >
-            {busy ? 'Applying…' : 'Apply colours'}
-          </button>
-          {dirty.perZone && <span className="dirty-note dim">Unapplied changes</span>}
-        </div>
-      </ControlBlock>
-
-      <ControlBlock
-        title="Four-Zone Effect"
-        gate={fourZoneGate}
-        hint="Animated lighting effects driven by the keyboard controller."
+        title="Lighting"
+        gate={blockGate}
+        hint="Pick an effect, set it up below, then apply."
       >
         <div className="effect-grid">
           {EFFECTS.map((e) => (
@@ -271,7 +240,7 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
               key={e.mode}
               type="button"
               className={`effect-tile${fourZone.mode === e.mode ? ' is-selected' : ''}`}
-              disabled={!fourZoneGate.ok || busy}
+              disabled={!blockGate.ok || busy}
               aria-pressed={fourZone.mode === e.mode}
               onClick={() => {
                 setDirty((d) => ({ ...d, fourZone: true }));
@@ -287,53 +256,133 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
 
         {effect?.note && <p className="effect-note dim">{effect.note}</p>}
 
-        <div className="kb-row kb-row-split">
-          <ColourField
-            label="Colour"
-            hex={fourZoneHex}
-            disabled={!fourZoneGate.ok || busy || !coloured}
-            hint={coloured ? undefined : 'This effect picks its own colours.'}
-            onChange={(v) => {
-              const rgb = hexToRgb(v);
-              if (!rgb) return;
-              setDirty((d) => ({ ...d, fourZone: true }));
-              setFourZone((f) => ({ ...f, ...rgb }));
-            }}
-          />
+        {/* Per-zone colours belong to Static and nowhere else. Every other
+            effect drives all four zones from one colour, or generates its
+            own, so four pickers there would offer a choice the firmware
+            discards. */}
+        <div className="kb-group">
+          <span className="kb-group-label">Colour</span>
+          {perZoneColours ? (
+            <div className="kb-colour-zones">
+              <div className="zone-grid">
+                {perZone.zones.map((hex, i) => (
+                  <ColourField
+                    key={i}
+                    label={ZONE_NAMES[i] as string}
+                    hex={hex}
+                    disabled={busy}
+                    onChange={(v) => editZone(i, v)}
+                  />
+                ))}
+              </div>
 
-          <Slider
-            label="Brightness"
-            value={fourZone.brightness}
-            disabled={!fourZoneGate.ok}
-            onChange={(v) => {
-              setDirty((d) => ({ ...d, fourZone: true }));
-              setFourZone((f) => ({ ...f, brightness: v }));
-            }}
-          />
-
-          <Slider
-            label="Speed"
-            value={fourZone.speed}
-            min={0}
-            max={9}
-            unit=""
-            disabled={!fourZoneGate.ok || !animated}
-            onChange={(v) => {
-              setDirty((d) => ({ ...d, fourZone: true }));
-              setFourZone((f) => ({ ...f, speed: v }));
-            }}
-          />
+              <div className="kb-swatches">
+                <span className="zone-label">Set all</span>
+                {PRESETS.map((p) => (
+                  <button
+                    key={p.hex}
+                    type="button"
+                    className="swatch"
+                    style={{ background: `#${p.hex}` }}
+                    title={p.name}
+                    aria-label={`Set every zone to ${p.name}`}
+                    disabled={busy}
+                    onClick={() => {
+                      setDirty((d) => ({ ...d, perZone: true }));
+                      setPerZone((z) => ({ ...z, zones: [p.hex, p.hex, p.hex, p.hex] }));
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="kb-colour-single">
+              <ColourField
+                label={effect.name}
+                hex={fourZoneHex}
+                disabled={!blockGate.ok || busy || !coloured}
+                onChange={(v) => {
+                  const rgb = hexToRgb(v);
+                  if (!rgb) return;
+                  setDirty((d) => ({ ...d, fourZone: true }));
+                  setFourZone((f) => ({ ...f, ...rgb }));
+                }}
+              />
+              {coloured ? (
+                <div className="kb-swatches">
+                  <span className="zone-label">Presets</span>
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p.hex}
+                      type="button"
+                      className="swatch"
+                      style={{ background: `#${p.hex}` }}
+                      title={p.name}
+                      aria-label={`Use ${p.name}`}
+                      disabled={busy}
+                      onClick={() => {
+                        const rgb = hexToRgb(p.hex);
+                        if (!rgb) return;
+                        setDirty((d) => ({ ...d, fourZone: true }));
+                        setFourZone((f) => ({ ...f, ...rgb }));
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="kb-note dim">
+                  {effect.name} generates its own colours, so there is nothing to pick here.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="kb-row">
-          <span className="zone-label">Direction</span>
+        <div className="kb-group">
+          <span className="kb-group-label">Levels</span>
+          <div className="kb-levels">
+            <Slider
+              label="Brightness"
+              value={perZoneColours ? perZone.brightness : fourZone.brightness}
+              disabled={!blockGate.ok}
+              onChange={(v) => {
+                if (perZoneColours) {
+                  setDirty((d) => ({ ...d, perZone: true }));
+                  setPerZone((p) => ({ ...p, brightness: v }));
+                } else {
+                  setDirty((d) => ({ ...d, fourZone: true }));
+                  setFourZone((f) => ({ ...f, brightness: v }));
+                }
+              }}
+            />
+
+            <Slider
+              label="Speed"
+              value={fourZone.speed}
+              min={0}
+              max={9}
+              unit=""
+              disabled={!blockGate.ok || !animated}
+              onChange={(v) => {
+                setDirty((d) => ({ ...d, fourZone: true }));
+                setFourZone((f) => ({ ...f, speed: v }));
+              }}
+            />
+          </div>
+          {!animated && (
+            <p className="kb-note dim">Speed applies to every effect except Static.</p>
+          )}
+        </div>
+
+        <div className="kb-group">
+          <span className="kb-group-label">Direction</span>
           <div className="direction-seg">
             {DIRECTIONS.map((d) => (
               <button
                 key={d.value}
                 type="button"
                 className={`seg${fourZone.direction === d.value ? ' seg-active' : ''}`}
-                disabled={!fourZoneGate.ok || !directional || busy}
+                disabled={!blockGate.ok || !directional || busy}
                 onClick={() => {
                   setDirty((x) => ({ ...x, fourZone: true }));
                   setFourZone((f) => ({ ...f, direction: d.value }));
@@ -344,7 +393,7 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
             ))}
           </div>
           {!directional && (
-            <span className="dim direction-note">Direction applies to Wave and Shifting.</span>
+            <p className="kb-note dim">Direction applies to Wave and Shifting only.</p>
           )}
         </div>
 
@@ -352,12 +401,14 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
           <button
             type="button"
             className="apply"
-            disabled={!fourZoneGate.ok || busy}
-            onClick={applyFourZone}
+            disabled={!blockGate.ok || busy}
+            onClick={perZoneColours ? applyPerZone : applyFourZone}
           >
-            {busy ? 'Applying…' : 'Apply effect'}
+            {busy ? 'Applying…' : 'Apply'}
           </button>
-          {dirty.fourZone && <span className="dirty-note dim">Unapplied changes</span>}
+          {(perZoneColours ? dirty.perZone : dirty.fourZone) && (
+            <span className="dirty-note dim">Unapplied changes</span>
+          )}
         </div>
       </ControlBlock>
 

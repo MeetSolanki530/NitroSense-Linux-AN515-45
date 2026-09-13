@@ -17,6 +17,7 @@ import { NitroMark } from '../components/NitroMark';
 import { useHistory } from '../state/history';
 import { usePowerState } from '../state/hardware';
 import type { Settings, Telemetry } from '../state/hardware';
+import { FanSpinner } from '../components/FanSpinner';
 import { fanLabel } from './homeFormat';
 import './Home.css';
 
@@ -68,7 +69,8 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
             {gpu?.name && (
               <span className="left-foot-item" title={gpu.name}>{gpu.name}</span>
             )}
-            <span className="left-foot-item mono-num">
+            <span className="left-foot-item mono-num left-foot-fan">
+              <FanSpinner rpm={telemetry?.fans.cpuRpm} size={20} label="CPU fan" />
               Fan{' '}
               {telemetry?.fans.cpuRpm === null || telemetry === null ? (
                 <span className="dim">--</span>
@@ -144,7 +146,10 @@ export function Home({ telemetry, settings, has }: Props): JSX.Element {
           </div>
           <div className="hatch" style={{ marginTop: 14 }} />
           <div className="fan-readout">
-            <span>Fan</span>
+            <span className="fan-readout-label">
+              <FanSpinner rpm={telemetry?.fans.cpuRpm} size={26} label="CPU fan" />
+              Fan
+            </span>
             <span className="mono-num">
               {telemetry?.fans.cpuRpm === null || !telemetry ? (
                 <span className="dim">-- RPM</span>
