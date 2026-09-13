@@ -69,6 +69,11 @@ The app shows them as unavailable instead of pretending.
   it. Power modes use the CPU governor instead, which does work.
 - **LCD override.** Writes report success, the value never changes.
 - **Boot animation and sound.** The firmware refuses both reading and writing.
+- **Reading the Fn brightness level.** Fn+F9 and Fn+F10 work, they are handled
+  in the embedded controller. But the controller does not tell the firmware,
+  and the firmware is all the driver can read, so the number in the app is the
+  level it last set rather than what is lit. Setting brightness from the app
+  still works.
 
 ## 📸 Screenshots
 

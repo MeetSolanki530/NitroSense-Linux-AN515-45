@@ -372,6 +372,16 @@ export function Keyboard({ settings, has, connection, refresh }: Props): JSX.Ele
           {!animated && (
             <p className="kb-note dim">Speed applies to every effect except Static.</p>
           )}
+          {/* Fn+F9 and Fn+F10 are handled inside the embedded controller,
+              which dims the backlight without telling the firmware. The WMI
+              read only ever returns the level something last wrote through
+              WMI, so it sits at whatever the app set and never follows the
+              keys. Saying so beats showing a number that looks wrong. */}
+          <p className="kb-note dim">
+            Brightness is the level NitroSense last set. Fn+F9 and Fn+F10 dim the
+            keyboard directly and the firmware does not report that back, so the
+            two can disagree until you apply from here again.
+          </p>
         </div>
 
         <div className="kb-group">
