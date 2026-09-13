@@ -152,6 +152,12 @@ The app shows them as unavailable instead of pretending.
 
 All taken on the AN515-45 with the daemon connected.
 
+**Home.** Everything at a glance. GPU clock on the left, temperatures down the
+middle, and the current mode, fan and battery on the right. The fans turn at
+the speed the hardware is actually running.
+
+![Home tab](screenshots/01-home.png)
+
 **Performance.** Power mode and fan control. Manual holds a fixed duty cycle,
 automatic hands the fans back to the firmware.
 
