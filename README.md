@@ -29,21 +29,90 @@ Check your model first:
 cat /sys/class/dmi/id/product_name
 ```
 
-- **Nitro AN515-45** 👉 should work exactly as described
-- **Another AN515** 👉 likely works, the keyboard lighting may need a quirk
-  entry adding (see `patches/`)
-- **Predator or other Acer** 👉 untested, no idea
+- **Nitro AN515-45** 👉 tested, works as described
+- **AN515-46, AN515-58, AN517-54, AN16-41, AN16-43, ANV15-41, ANV15-51**
+  👉 good chance, the driver already recognises these
+- **Other models in the list below** 👉 same lighting hardware, but the driver
+  needs a quirk entry adding for yours first
+- **Predator or other Acer** 👉 no idea, nothing to go on
 
-Two things decide whether the keyboard lighting works on a given model: the
-driver needs a DMI entry for it, and the Fn key has to report a keycode the
-desktop can see. Both are covered in `patches/` for the AN515-45.
+### 🧩 Models with the same keyboard hardware
+
+Only the AN515-45 has been tested, and only that one is claimed to work. But
+Acer's own Windows installer ships a per-model config, and every model below
+declares identical keyboard lighting: `LightingType Type:1`, four zones, no
+per-key. So the lighting side of this has a fair chance on any of them.
+
+```
+AN515-43   AN515-44   AN515-45   AN515-46   AN515-47   AN515-51s
+AN515-54   AN515-55   AN515-56   AN515-57   AN515-58
+AN517-41   AN517-42   AN517-43   AN517-51   AN517-52
+AN517-53   AN517-54   AN517-55
+AN715-41   AN715-51   AN715-52
+```
+
+That is a statement about the hardware, not a promise about the software. Fan
+control, power modes and battery limits go through different firmware calls and
+may behave differently on any of them.
+
+### 🔧 Adding your model
+
+Two things decide whether the keyboard lighting works: the driver needs a DMI
+entry for your model, and the Fn key has to report a keycode the desktop can
+see. Both are covered in `patches/` for the AN515-45, and the DMI entry is a
+few lines.
+
+Find your product name:
+
+```bash
+cat /sys/class/dmi/id/product_name
+```
+
+Then copy the `quirk_acer_nitro_an515_45` block and its `dmi_system_id` entry in
+`patches/linuwu-sense-an515-45-rgb.patch`, changing the name to match. If the
+four-zone files appear under
+`/sys/devices/platform/acer-wmi/four_zoned_kb/` after a rebuild, it worked.
+
+A pull request adding your model is welcome, though nobody here can test it.
 
 ### Needs
 
+The installer checks all of this on your machine and tells you what is
+missing, with the command to fix it. Nothing here has to be sorted out first.
+
+**Required**, and pulled in automatically by `apt`:
+
+- `python3`, for the background service
+- `gcc` and `make`, to build the driver
+- `policykit-1`, so the app can offer to start the service for you
+
+**Required, but you have to install it yourself:**
+
+```bash
+sudo apt install linux-headers-$(uname -r)
+```
+
+The package name carries your kernel version, so it cannot be a fixed
+dependency. Without it the app installs and runs, but every hardware control
+shows as unavailable until the driver can be built.
+
+**Optional:**
+
+- the NVIDIA driver, for discrete GPU temperature, clock and utilisation.
+  Without it those readings stay blank; everything else is unaffected, and the
+  integrated GPU is read straight from sysfs.
+
+**Also:**
+
 - a GNOME based desktop for the NitroSense key shortcut (the rest works
   anywhere)
-- kernel headers, gcc and make, to build the driver at install time
 - Secure Boot off, or the module signed yourself, since it is out of tree
+
+If something was missing at install time, fix it and then rebuild the driver:
+
+```bash
+sudo dpkg-reconfigure nitrosense
+```
 
 ![app icon](app/build/icons/128x128.png)
 
@@ -98,8 +167,8 @@ applies to Wave and Shifting.
 
 ![Keyboard effects](screenshots/05-keyboard-effects.png)
 
-**Monitoring.** Temperature and utilisation over time, plus every sensor the
-machine exposes.
+**Monitoring.** Temperature and utilisation over time for the CPU, both GPUs
+and memory, plus every sensor the machine exposes.
 
 ![Monitoring tab](screenshots/06-monitoring.png)
 
