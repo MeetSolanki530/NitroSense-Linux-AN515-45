@@ -45,7 +45,7 @@ check('parses speed', fz?.speed === 7);
 check('parses brightness', fz?.brightness === 90);
 check('parses direction', fz?.direction === 2);
 check('parses rgb', fz?.red === 255 && fz?.green === 106 && fz?.blue === 0);
-check('clamps mode above 5', parseFourZone('99,5,50,1,0,0,0')?.mode === 5);
+check('clamps mode above 6', parseFourZone('99,5,50,1,0,0,0')?.mode === 6);
 check('clamps speed above 9', parseFourZone('0,50,50,1,0,0,0')?.speed === 9);
 check('falls back to direction 1 when invalid', parseFourZone('0,5,50,9,0,0,0')?.direction === 1);
 check('clamps rgb above 255', parseFourZone('0,5,50,1,999,0,0')?.red === 255);
@@ -53,10 +53,16 @@ check('rejects too few fields', parseFourZone('0,5,50') === null);
 check('rejects non-numeric fields', parseFourZone('a,b,c,d,e,f,g') === null);
 
 console.log('\n4. Effect semantics (what the firmware honours)');
-check('six effects are exposed', EFFECTS.length === 6);
-check('mode 0 is Static', EFFECTS[0]?.name === 'Static');
+// Seven entries: Off plus six effects. The mode numbers were established by
+// sweeping all 256 values on AN515-45, not copied from another driver.
+check('off plus six effects are exposed', EFFECTS.length === 7);
+check('mode 0 is Off, not Static', EFFECTS[0]?.name === 'Off');
+check('mode 6 is offered; it works and was wrongly excluded',
+  EFFECTS.some((e) => e.mode === 6));
+check('Off takes no colour', usesColour(0) === false);
+check('Off takes no speed', usesAnimation(0) === false);
 check('mode 5 is Zoom', EFFECTS[5]?.name === 'Zoom');
-check('Static ignores speed', usesAnimation(0) === false);
+check('mode 6 is Meteor', EFFECTS[6]?.name === 'Meteor');
 check('Breathing uses speed', usesAnimation(1) === true);
 check('Neon uses speed', usesAnimation(2) === true);
 
@@ -84,7 +90,8 @@ check('Shifting uses speed', usesAnimation(4) === true);
 const blackStatic = { mode: 0, speed: 0, brightness: 100, direction: 1,
                       red: 0, green: 0, blue: 0 };
 
-check('black Static gets a usable colour', withUsableColour(blackStatic).red === 255);
+// Off takes no colour, so there is nothing to rescue there.
+check('Off is left alone by the colour guard', withUsableColour(blackStatic).red === 0);
 check('black Breathing gets a usable colour',
   withUsableColour({ ...blackStatic, mode: 1 }).red === 255);
 check('black Shifting gets a usable colour',
@@ -115,15 +122,15 @@ check('after an effect, both speed and colour are rescued',
 
 check('Wave uses direction', usesDirection(3) === true);
 check('Shifting uses direction', usesDirection(4) === true);
-check('Static does not use direction', usesDirection(0) === false);
+check('Off does not use direction', usesDirection(0) === false);
 check('Breathing does not use direction', usesDirection(1) === false);
 check('Zoom does not use direction', usesDirection(5) === false);
 
 check('Neon discards colour', usesColour(2) === false);
 check('Wave discards colour', usesColour(3) === false);
-check('Static uses colour', usesColour(0) === true);
+check('Meteor uses colour', usesColour(6) === true);
 check('Shifting uses colour', usesColour(4) === true);
-check('unknown mode falls back to Static', effectFor(99).name === 'Static');
+check('unknown mode falls back to the first entry', effectFor(99).name === 'Off');
 
 // The preview draws one lighting state from two reads, and only one of them
 // describes the hardware at a time. Getting this wrong is what made a keyboard
@@ -138,11 +145,14 @@ const zonesRGBY = {
 const staticFZ = { mode: 0, speed: 0, brightness: 100, direction: 1,
                    red: 0, green: 0, blue: 0 };
 
-const asStatic = describeLighting(zonesRGBY, staticFZ);
-check('static shows the four zone colours',
-  asStatic.swatches.join() === '#ff0000,#00ff00,#0000ff,#ffff00');
-check('static takes per-zone brightness', asStatic.brightness === 60);
-check('static glow matches its swatch', asStatic.glows[0] === '#ff0000');
+// Mode 0 is off, so the preview must show unlit keys rather than a colour.
+// Showing the per-zone colours here is what made the old preview claim the
+// keyboard was lit while it was actually dark.
+const asOff = describeLighting(zonesRGBY, staticFZ);
+check('off shows unlit keys, not the zone colours',
+  asOff.swatches.every((s) => s === asOff.swatches[0] && !s.includes('ff0000')));
+check('off says so in the caption', asOff.caption.toLowerCase().includes('off'));
+check('off has no glow', asOff.glows.every((g) => g === 'transparent'));
 
 // Breathing blue, while per-zone still reports the stale red/green/blue/yellow.
 const breathing = describeLighting(zonesRGBY,
@@ -165,7 +175,7 @@ check('an own-colour effect says so', neon.caption.includes('cycles its own colo
 
 // A gradient in box-shadow is silently dropped, so glows must never be one.
 check('no glow is ever a gradient',
-  [asStatic, breathing, neon].every((p) => p.glows.every((g) => !g.includes('gradient'))));
+  [asOff, breathing, neon].every((p) => p.glows.every((g) => !g.includes('gradient'))));
 
 const wave = describeLighting(zonesRGBY,
   { mode: 3, speed: 5, brightness: 100, direction: 2, red: 0, green: 0, blue: 0 });
@@ -176,7 +186,7 @@ check('the other direction reads the other way',
   waveBack.caption.includes('right to left'));
 
 check('every preview fills exactly four zones',
-  [asStatic, breathing, neon, wave].every((p) => p.swatches.length === 4 && p.glows.length === 4));
+  [asOff, breathing, neon, wave].every((p) => p.swatches.length === 4 && p.glows.length === 4));
 
 console.log(`\n${failed === 0 ? '\x1b[32m' : '\x1b[31m'}${passed} passed, ${failed} failed\x1b[0m\n`);
 process.exit(failed === 0 ? 0 : 1);

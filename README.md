@@ -55,7 +55,7 @@ desktop can see. Both are covered in `patches/` for the AN515-45.
 | ⚡ Power modes (Quiet / Balanced / Performance) | works |
 | 🔋 Battery limit at 80% | works |
 | 🔌 USB charging while the lid is shut | works |
-| ⌨️ Keyboard RGB, per zone and 6 effects | works |
+| ⌨️ Keyboard lighting, 6 effects and off | works |
 | 💾 Lighting comes back after a reboot | works |
 | 🌡️ Live temps, fan RPM, CPU and GPU usage | works |
 | 🎹 NitroSense key opens the app | works |
@@ -69,6 +69,13 @@ The app shows them as unavailable instead of pretending.
   it. Power modes use the CPU governor instead, which does work.
 - **LCD override.** Writes report success, the value never changes.
 - **Boot animation and sound.** The firmware refuses both reading and writing.
+- **A fixed colour of your choosing.** The six effects work, but there is no
+  static colour. Mode 0, which every other implementation calls Static, is
+  really off: the firmware writes it straight into the EC's KBLE register and
+  0 means the backlight is off. All 256 values were swept and only 1 to 6
+  light, all of them animations. Per-zone colours do reach the hardware, they
+  are just never displayed by anything. The same bug is open upstream for the
+  AN515-58. Details and everything ruled out are in `docs-rgb-findings.md`.
 - **Reading the Fn brightness level.** Fn+F9 and Fn+F10 work, they are handled
   in the embedded controller. But the controller does not tell the firmware,
   and the firmware is all the driver can read, so the number in the app is the
@@ -165,6 +172,30 @@ One command, brings up the driver, the service and the app together. Nothing
 persists, a reboot clears it. Good for testing.
 
 Full build, test, release and cleanup steps are in [BUILDING.md](BUILDING.md).
+
+## 🔦 Keyboard stuck dark?
+
+If the lighting goes off and stays off, even after a reboot, the EC has handed
+control to software and nothing gave it back. A flag called PSEE decides who
+owns the lighting, every Linux driver for this hardware sets it on the first
+write, and none of them clear it.
+
+Two ways out. The simple one, no tools:
+
+1. Shut down, not reboot
+2. Unplug the charger
+3. Hold the power button 30 seconds with no power connected
+4. Plug in and boot
+
+Or clear the flag directly, which works without a power cycle:
+
+```bash
+sudo modprobe ec_sys write_support=1
+printf '\x21' | sudo dd of=/sys/kernel/debug/ec/ec0/io bs=1 seek=3 count=1 conv=notrunc
+```
+
+That clears bit 4 of EC byte 0x03 and the EC takes the keyboard back, lighting
+it its own red. Picking any effect in the app hands control back to software.
 
 ## 🐛 Something broken?
 

@@ -20,3 +20,18 @@ Linuwu-Sense/
 # for comparison while debugging. Not part of the project, not published.
 docs/
 .claude
+
+# Acer's own NitroSense installer and anything extracted from it. Kept locally
+# for reverse engineering the WMI interface; theirs, not ours to redistribute.
+Nitro Sense_Acer_*/
+ns-extract/
+*.resources
+
+# Reference checkouts and a worktree of an earlier commit, used for comparing
+# behaviour against this one while debugging.
+ref-dmm/
+yesterday/
+
+# Machine-specific firmware dumps: ACPI tables and EC register captures. Useful
+# while investigating, meaningless on anyone else's laptop.
+acpi/

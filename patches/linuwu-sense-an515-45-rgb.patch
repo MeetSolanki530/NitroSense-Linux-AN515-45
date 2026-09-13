@@ -1,6 +1,18 @@
 --- a/src/linuwu_sense.c
 +++ b/src/linuwu_sense.c
-@@ -560,6 +560,15 @@
+@@ -545,7 +545,10 @@
+     .four_zone_kb = 1,
+ };
+ 
+- static struct quirk_entry quirk_acer_nitro_anv16_41 = {
++/* Declared upstream but never added to the DMI table, so it is dead code and
++ * the compiler warns on every build. Marked rather than deleted: the entry is
++ * presumably waiting on someone with that model to wire it up. */
++static struct quirk_entry __maybe_unused quirk_acer_nitro_anv16_41 = {
+     .nitro_v4 = 1,
+     .four_zone_kb = 0,
+  };
+@@ -560,6 +563,15 @@
      .four_zone_kb = 1,
   };
  
@@ -16,7 +28,7 @@
  
  static struct quirk_entry quirk_acer_nitro = {
      .nitro_sense = 1,
-@@ -669,6 +678,15 @@
+@@ -669,6 +681,15 @@
      },
      {
           .callback = dmi_matched,
@@ -32,7 +44,7 @@
           .ident = "Acer Nitro AN515-46",
           .matches = {
               DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
-@@ -3986,7 +4004,11 @@
+@@ -4008,7 +4029,11 @@
                                   int direction, int red, int green, int blue)
  {
      u64 resp = 0;
@@ -45,27 +57,29 @@
  
      acpi_status status;
      union acpi_object *obj;
-@@ -4164,41 +4186,17 @@
+@@ -4186,41 +4211,19 @@
          return -EINVAL;
      }
  
 -    switch (mode)
-+    /* Only static is normalised. This driver used to zero fields per mode —
++    /* Only mode 0 is normalised. This driver used to zero fields per mode —
 +     * speed for breathing, colour for neon, direction for zoom/meteor/
 +     * twinkling — and on AN515-45 that switched those effects off outright: a
 +     * breath at speed 0 parks at the dark end of its cycle, a neon at
-+     * rgb 0,0,0 is black. facer passes every field through untouched and all
-+     * effects light, so only static keeps its zeroing (which is what facer
-+     * sends for static too). */
++     * rgb 0,0,0 is black. Passing every field through lights all six effects,
++     * including mode 6, which the per-mode zeroing had made look dead.
++     *
++     * Mode 0 keeps its zeroing because it is off, not static, so the other
++     * fields are meaningless there. */
 +    if (mode == 0x0)
      {
 -    case 0x0: // Static mode: Ignore speed and direction
--        speed = 0;
--        direction = 0;
--        break;
--    case 0x1: // Breathing mode: Ignore speed
          speed = 0;
          direction = 0;
+-        break;
+-    case 0x1: // Breathing mode: Ignore speed
+-        speed = 0;
+-        direction = 0;
 -        break;
 -    case 0x2: // Neon mode: Ignore red, green, blue, and direction
 -        red = 0;
@@ -95,7 +109,7 @@
      }
  
      status = set_kb_status(mode, speed, brightness, direction, red, green, blue);
-@@ -4246,30 +4244,63 @@
+@@ -4268,30 +4271,72 @@
      return AE_OK;
  }
  
@@ -150,16 +164,25 @@
      }
 -    /* set per_zone to 1*/
 +
-+    /* Zeros here on purpose: static mode on this firmware shows the per-zone
-+     * colours written above, and the global RGB is ignored.
++    /* WARNING: on AN515-45 this call switches the keyboard OFF.
 +     *
-+     * Do not "fix" this by passing a colour, and do not reverse the order
-+     * above. Both were tried on AN515-45 and neither changed anything,
-+     * because the failure they were aimed at is not in this function. Once
-+     * this firmware has been driven into an animated mode it stops honouring
-+     * mode 0 until a reboot, which another AN515-45 owner reported
-+     * independently:
-+     * github.com/JafarAkhondali/acer-predator-turbo-and-rgb-keyboard-linux-module/issues/63
++     * Mode 0 is not static. The firmware writes byte 0 straight into the EC's
++     * KBLE register, and KBLE 0 means the backlight is off. Established by
++     * sweeping all 256 values: only 1 to 6 light, and all six are animations
++     * reading KBCR/KBCG/KBCB rather than the zone colours set above.
++     *
++     * So the zone writes land correctly, confirmed by reading KB1R..KB4B back
++     * out of the EC, and nothing ever displays them. There is no per-zone
++     * colour on this model through this interface.
++     *
++     * This call also sets PSEE, the flag that takes the lighting away from the
++     * EC and hands it to software, and nothing here ever gives it back. That
++     * is why a keyboard that has been blanked once stays blanked across
++     * reboots: the EC only reclaims it when PSEE is cleared, which needs
++     * either an EC write or a 30 second power cycle.
++     *
++     * Do not "fix" this by passing a colour or reversing the order above.
++     * Both were tried and changed nothing. See docs-rgb-findings.md.
 +     */
 +    status = set_kb_status(0, 0, input->brightness, 0, 0, 0, 0);
 +    if (ACPI_FAILURE(status))
@@ -170,3 +193,11 @@
  
      current_kb_state.per_zone = 1;
  
+@@ -4485,6 +4530,7 @@
+ /* Four Zoned Keyboard Attributes */
+ static struct device_attribute four_zoned_rgb_mode = __ATTR(four_zone_mode, 0644, four_zoned_rgb_kb_show, four_zoned_rgb_kb_store);
+ static struct device_attribute per_zoned_rgb_mode = __ATTR(per_zone_mode, 0644, per_zoned_rgb_kb_show, per_zoned_rgb_kb_store);
++
+ static struct attribute *four_zoned_kb_attrs[] = {
+     &four_zoned_rgb_mode.attr,
+     &per_zoned_rgb_mode.attr,

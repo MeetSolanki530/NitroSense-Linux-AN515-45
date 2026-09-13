@@ -7,14 +7,27 @@
  *                   zones are 6-digit hex without a leading #
  *   four_zone_mode  "mode,speed,brightness,direction,red,green,blue"
  *
- * Acer's WMI interface implements six effects:
- *   0 Static, 1 Breathing, 2 Neon, 3 Wave, 4 Shifting, 5 Zoom.
+ * The mode numbers were established by sweeping all 256 values on AN515-45
+ * hardware, not taken from another implementation:
  *
- * The driver's switch also has cases for 6 (Meteor) and 7 (Twinkling), and
- * the daemon's table repeats them, but the firmware never implemented those
- * two: writing either is accepted and leaves the keyboard dark. Confirmed on
- * AN515-45, and every independent reverse-engineering of this interface
- * (facer, Acer-SenSe) stops at 5.
+ *   0        off
+ *   1 to 6   Breathing, Neon, Wave, Shifting, Zoom, Meteor
+ *   7 to 255 nothing, the keyboard stays dark
+ *
+ * Mode 0 is off, not static. The firmware writes byte 0 of the payload
+ * straight into the EC's KBLE register with no validation, and KBLE 0
+ * switches the backlight off. Calling it Static, which every other
+ * implementation does, produced an app that turned the keyboard off when the
+ * user asked for a fixed colour.
+ *
+ * Mode 6 does work. It was previously written off as dead because it was
+ * being sent with speed 0, which parks any animated effect at the dark end of
+ * its cycle.
+ *
+ * per_zone_mode writes land correctly in the EC's KB1R..KB4B registers, but
+ * no mode displays them: every effect reads KBCR/KBCG/KBCB instead. So there
+ * is no per-zone colour on this model through this interface. See
+ * docs-rgb-findings.md.
  */
 
 /** Mid-range, matching what the effect tiles start on. */
@@ -49,9 +62,26 @@ export type Effect = {
   note?: string;
 };
 
+/**
+ * Mode 0 is Off, not Static.
+ *
+ * Read out of this machine's own firmware. The WMI handler writes byte 0 of
+ * the payload straight into the EC's KBLE register with no validation, and
+ * KBLE 0 switches the backlight off. 1 to 5 are the real effects.
+ *
+ * It was labelled Static because every other implementation labels it that,
+ * and the result was an app that turned your keyboard off when you asked for
+ * a fixed colour. The write succeeded, the colours were provably correct in
+ * the EC's KB1R..KB4B registers, and nothing lit, which is why it looked like
+ * broken hardware rather than a wrong mode number.
+ *
+ * There is no known way to display a fixed colour on AN515-45. The zone
+ * colours reach the hardware but no KBLE value has been found that shows
+ * them; the effects use KBCR/KBCG/KBCB instead. See docs-rgb-findings.md.
+ */
 export const EFFECTS: Effect[] = [
-  { mode: 0, name: 'Static', usesColour: true, usesSpeed: false, usesDirection: false,
-    note: 'A fixed colour. Speed and direction do not apply.' },
+  { mode: 0, name: 'Off', usesColour: false, usesSpeed: false, usesDirection: false,
+    note: 'Switches the keyboard lighting off.' },
   { mode: 1, name: 'Breathing', usesColour: true, usesSpeed: true, usesDirection: false,
     note: 'Pulses the colour on and off. Speed sets the rate.' },
   { mode: 2, name: 'Neon', usesColour: false, usesSpeed: true, usesDirection: false,
@@ -62,6 +92,8 @@ export const EFFECTS: Effect[] = [
     note: 'The only effect that uses every input.' },
   { mode: 5, name: 'Zoom', usesColour: true, usesSpeed: true, usesDirection: false,
     note: 'Pulses out from the centre of the keyboard.' },
+  { mode: 6, name: 'Meteor', usesColour: true, usesSpeed: true, usesDirection: false,
+    note: 'Drops the colour down the keyboard. Needs a speed above zero.' },
 ];
 
 export function effectFor(mode: number): Effect {
@@ -159,7 +191,7 @@ export function parseFourZone(raw: unknown): FourZone | null {
 
   const [mode, speed, brightness, direction, red, green, blue] = parts as number[];
   return {
-    mode: clampInt(mode as number, 0, 5),
+    mode: clampInt(mode as number, 0, 6),
     speed: clampInt(speed as number, 0, 9),
     brightness: clampInt(brightness as number, 0, 100),
     // Anything outside 1-2 is meaningless; fall back to the daemon's default.
@@ -220,13 +252,14 @@ const OWN_COLOURS =
 export function describeLighting(perZone: PerZone, fourZone: FourZone): LightingPreview {
   const effect = effectFor(fourZone.mode);
 
+  // Mode 0 is off, so the preview shows unlit keys rather than a colour.
   if (fourZone.mode === 0) {
-    const zones = perZone.zones.map((hex) => `#${hex}`) as LightingPreview['swatches'];
+    const dark = '#15100c';
     return {
-      swatches: zones,
-      glows: [...zones] as LightingPreview['glows'],
-      brightness: perZone.brightness,
-      caption: 'Per-zone colours. Indicative only, not a live capture of the keyboard.',
+      swatches: [dark, dark, dark, dark],
+      glows: ['transparent', 'transparent', 'transparent', 'transparent'],
+      brightness: 100,
+      caption: 'Lighting is off.',
     };
   }
 
