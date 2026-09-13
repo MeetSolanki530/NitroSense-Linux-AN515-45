@@ -62,15 +62,50 @@ On AN515-45 both calls return status 1 and a write leaves the stored value
 unchanged, so the setting is genuinely unsupported there — but this patch is
 not model-specific: it is how the reply is defined for every model.
 
+## linuwu-sense-backlight-timeout-decode.patch
+
+Same class of bug as above, in `backlight_timeout`, but with the opposite
+conclusion: here the hardware was fine and the driver was wrong.
+
+`predator_backlight_timeout_show` matched the whole reply against two
+constants:
+
+```c
+result == 0x1E0000080000 ? 1 : result == 0x80000 ? 0 : -1
+```
+
+The reply is not a scalar. Bits 63:40 hold the idle timeout in seconds, and
+the low word echoes the function selector. `0x1E` is 30, so upstream recognised
+exactly one timeout: thirty seconds. An AN515-45 as shipped reports
+`0x210000080000`, which is 33 seconds, and that fell straight through to -1.
+The feature worked the whole time; only the readout was broken, and the app
+showed the toggle as "unknown" because of it.
+
+Reading the duration field instead makes it correct for any value:
+
+```c
+FIELD_GET(ACER_BACKLIGHT_TIMEOUT_SECONDS_MASK, result) ? 1 : 0
+```
+
+Measured on an AN515-45, writing 0 then 1 gives `0x80000` (0s) and
+`0x1E0000080000` (30s), so the field tracks the setting exactly.
+
+The patch also leaves a note on `lcd_override`, which looks like the same bug
+and is not. Its reply puts the state in bits 55:48, and this model returns
+`0xFF` there rather than 0 or 1, unchanged across five writes that each
+reported success. `0xFF` is the firmware saying "not applicable", so -1 is the
+right answer there and the setting stays disabled in the UI.
+
 ### Applying
 
 ```bash
 cd Linuwu-Sense
 patch -p1 < ../patches/linuwu-sense-an515-45-rgb.patch
 patch -p1 < ../patches/linuwu-sense-misc-setting-status.patch
+patch -p1 < ../patches/linuwu-sense-backlight-timeout-decode.patch
 ```
 
-They touch different functions and apply cleanly in either order.
+They touch different functions and apply cleanly in any order.
 
 Then load it non-persistently:
 

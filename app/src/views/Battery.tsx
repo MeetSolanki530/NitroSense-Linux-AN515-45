@@ -39,12 +39,16 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
 
   // "-1" from the driver means it could not read the setting at all.
   //
-  // These two are not the same case. backlight_timeout can read unknown while
-  // its writes still land, so it stays usable and only gets an explanatory
-  // hint. boot_animation_sound reads unknown because the firmware returns an
-  // error status for the query, and returns the same error for writes, which
-  // leave the stored value unchanged — so it is disabled outright rather than
-  // inviting a click that errors.
+  // backlight_timeout used to land here too, but that was the driver's decoder
+  // rejecting a timeout value it did not have a constant for, not the hardware
+  // refusing anything; it now reads the duration field and reports a real
+  // on/off. Kept as a guard so a firmware that genuinely does refuse still
+  // gets an explanation rather than a bare "unknown".
+  //
+  // boot_animation_sound is the different case: the firmware returns an error
+  // status for the query, and the same error for writes, which leave the
+  // stored value unchanged. It is disabled outright rather than inviting a
+  // click that errors.
   const bootUnreadable = settingUnsupported(settings, 'boot_animation_sound');
   const backlightUnreadable = settingUnsupported(settings, 'backlight_timeout');
 
@@ -168,9 +172,9 @@ export function Battery({ settings, telemetry, has, connection, refresh }: Props
           disabled={!connected || !has('lcd_override')}
           broken={
             connected && has('lcd_override')
-              ? 'Confirmed non-functional on this hardware: 5 direct writes each reported success, ' +
-                'and the driver’s own readback never changed even once. Same class of firmware ' +
-                'gap as thermal-mode switching.'
+              ? 'Confirmed absent on this hardware. The firmware reports this setting as ' +
+                '“not applicable”, and five direct writes each returned success without the ' +
+                'stored value ever changing. Same class of firmware gap as thermal-mode switching.'
               : undefined
           }
           onChange={(next) => void run(() => window.nitrosense.setLcdOverride(next))}

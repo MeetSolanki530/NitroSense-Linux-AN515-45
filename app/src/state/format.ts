@@ -22,29 +22,26 @@ export function toBool(raw: unknown): Tri {
 }
 
 /**
- * The driver writes -1 for backlight_timeout, boot_animation_sound and
- * lcd_override on this model when GET returns a raw value outside its
- * hardcoded lookup table (magic constants lifted from a different Acer
- * model) — a decode gap, not proof the feature is unimplemented. Confirmed
- * via dmesg: `boot_animation_sound get status: 1` still yielded sysfs "-1",
- * because 1 matched neither constant the driver recognised (now fixed to
- * recognise it, see linuwu_sense.c's predator_boot_animation_sound_show).
+ * "-1" is the driver's convention for "I could not read this setting".
  *
- * That decode gap is a GET-side problem, and SET does not depend on it — it
- * writes its own fixed constants. This held for backlight_timeout: a direct
- * write logged `set status: 0` with no ACPI failure, and its readout later
- * resolved to a real value on its own.
+ * It used to mean two quite different things, and untangling them mattered:
  *
- * It did NOT hold for lcd_override: five direct writes each logged `set
- * status: 0`, and the GET readback never changed even once across all of
- * them. That is a stronger, different finding — the hardware genuinely does
- * not respond, not merely an unreadable state — so lcd_override is disabled
- * outright (Toggle's `broken` prop) rather than left inviting a click that
- * can never do anything. This detector only classifies the raw sysfs value;
- * it is the caller's job to decide unknown-but-usable vs. confirmed-broken.
+ *  - backlight_timeout read -1 purely because the driver's decoder compared
+ *    the whole WMI reply against constants taken from a Predator, so it only
+ *    recognised a 30 second timeout. This Nitro shipped with 33 seconds and
+ *    fell through to -1 while the feature worked fine. The driver now decodes
+ *    the duration field, so this one reports a real on/off.
  *
- * Kept for the explanatory hint in the UI, not to disable anything on its
- * own.
+ *  - boot_animation_sound reads -1 because the firmware returns an error
+ *    status for the query, and the same error for writes, which leave the
+ *    stored value unchanged. lcd_override reads -1 because the firmware
+ *    reports the setting as not applicable, unchanged across five writes that
+ *    each claimed success. Both are genuine absences, so both are disabled
+ *    outright (Toggle's `broken` prop) rather than inviting a click that can
+ *    never do anything.
+ *
+ * This detector only classifies the raw sysfs value; deciding
+ * unknown-but-usable vs. confirmed-broken is the caller's job.
  */
 export function isUnsupported(raw: unknown): boolean {
   return typeof raw === 'string' && raw.trim() === '-1';
