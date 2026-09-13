@@ -82,6 +82,28 @@ export function withUsableSpeed(fz: FourZone): FourZone {
   return { ...fz, speed: DEFAULT_EFFECT_SPEED };
 }
 
+/** Used when a colour is needed and the one we have is unusable. */
+export const DEFAULT_COLOUR = { red: 255, green: 106, blue: 0 };
+
+/**
+ * Keep a colour-using effect from being applied as black.
+ *
+ * The firmware reports 0,0,0 in the colour fields after a per-zone write and
+ * for effects that generate their own colours. Adopting that verbatim and then
+ * applying it writes black, and black is indistinguishable from the keyboard
+ * being off. Worse, it looks like broken hardware: the Fn brightness keys
+ * appear dead too, because scaling black gives black at every level.
+ *
+ * A zero here therefore means "the firmware had nothing to tell us", not "the
+ * user picked black". Effects that generate their own colours are left alone,
+ * since the field is ignored for those anyway.
+ */
+export function withUsableColour(fz: FourZone): FourZone {
+  if (!usesColour(fz.mode)) return fz;
+  if (fz.red > 0 || fz.green > 0 || fz.blue > 0) return fz;
+  return { ...fz, ...DEFAULT_COLOUR };
+}
+
 export const DIRECTIONS: { value: number; label: string }[] = [
   { value: 1, label: 'Right to left' },
   { value: 2, label: 'Left to right' },

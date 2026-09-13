@@ -7,7 +7,7 @@
 import {
   DEFAULT_EFFECT_SPEED, EFFECTS, describeLighting, effectFor, hexToRgb,
   normaliseHex, parseFourZone, parsePerZone, rgbToHex, usesAnimation,
-  usesColour, usesDirection, withUsableSpeed,
+  usesColour, usesDirection, withUsableColour, withUsableSpeed,
 } from '../src/state/keyboard.ts';
 
 let passed = 0;
@@ -76,6 +76,42 @@ check('a speed the user chose is left alone',
 check('nothing else is altered',
   withUsableSpeed({ ...fromStatic, mode: 1 }).red === 255);
 check('Shifting uses speed', usesAnimation(4) === true);
+
+// The firmware reports 0,0,0 in the colour fields after a per-zone write and
+// for effects that pick their own colours. Applying that verbatim writes black,
+// which turns the keyboard off and makes the Fn brightness keys look dead too,
+// because scaling black gives black at every level.
+const blackStatic = { mode: 0, speed: 0, brightness: 100, direction: 1,
+                      red: 0, green: 0, blue: 0 };
+
+check('black Static gets a usable colour', withUsableColour(blackStatic).red === 255);
+check('black Breathing gets a usable colour',
+  withUsableColour({ ...blackStatic, mode: 1 }).red === 255);
+check('black Shifting gets a usable colour',
+  withUsableColour({ ...blackStatic, mode: 4 }).red === 255);
+check('black Zoom gets a usable colour',
+  withUsableColour({ ...blackStatic, mode: 5 }).red === 255);
+
+check('a colour the user chose is left alone',
+  withUsableColour({ ...blackStatic, blue: 255 }).blue === 255);
+check('a barely-lit colour is left alone, it is still a colour',
+  withUsableColour({ ...blackStatic, green: 1 }).green === 1
+  && withUsableColour({ ...blackStatic, green: 1 }).red === 0);
+
+// Neon and Wave ignore the colour field, so there is nothing to rescue.
+check('Neon is left black, it picks its own',
+  withUsableColour({ ...blackStatic, mode: 2 }).red === 0);
+check('Wave is left black, it picks its own',
+  withUsableColour({ ...blackStatic, mode: 3 }).red === 0);
+
+check('nothing but the colour is altered',
+  withUsableColour({ ...blackStatic, mode: 1, speed: 3 }).speed === 3);
+
+// The two guards compose: this is the state after Wave, where the firmware
+// reports both speed 0 and colour 0,0,0.
+const afterWave = withUsableColour(withUsableSpeed({ ...blackStatic, mode: 1 }));
+check('after an effect, both speed and colour are rescued',
+  afterWave.speed === DEFAULT_EFFECT_SPEED && afterWave.red === 255);
 
 check('Wave uses direction', usesDirection(3) === true);
 check('Shifting uses direction', usesDirection(4) === true);

@@ -16,6 +16,17 @@ You also need these for the kernel driver to build at install time:
 sudo apt install linux-headers-$(uname -r) build-essential
 ```
 
+## ⚠️ Bump the version before rebuilding
+
+`apt install` compares version strings and does nothing when they match, so a
+rebuild at the same version installs silently as a no-op. You then test the old
+binary and think the fix did not work. Bump `version` in `app/package.json`
+first, or force it with:
+
+```bash
+sudo dpkg -i ./release/nitrosense_0.1.0_amd64.deb
+```
+
 ## 🔨 Build
 
 ```bash
