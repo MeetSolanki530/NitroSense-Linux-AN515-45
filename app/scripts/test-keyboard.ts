@@ -45,7 +45,7 @@ check('parses speed', fz?.speed === 7);
 check('parses brightness', fz?.brightness === 90);
 check('parses direction', fz?.direction === 2);
 check('parses rgb', fz?.red === 255 && fz?.green === 106 && fz?.blue === 0);
-check('clamps mode above 6', parseFourZone('99,5,50,1,0,0,0')?.mode === 6);
+check('clamps mode above 5', parseFourZone('99,5,50,1,0,0,0')?.mode === 5);
 check('clamps speed above 9', parseFourZone('0,50,50,1,0,0,0')?.speed === 9);
 check('falls back to direction 1 when invalid', parseFourZone('0,5,50,9,0,0,0')?.direction === 1);
 check('clamps rgb above 255', parseFourZone('0,5,50,1,999,0,0')?.red === 255);
@@ -53,16 +53,17 @@ check('rejects too few fields', parseFourZone('0,5,50') === null);
 check('rejects non-numeric fields', parseFourZone('a,b,c,d,e,f,g') === null);
 
 console.log('\n4. Effect semantics (what the firmware honours)');
-// Seven entries: Off plus six effects. The mode numbers were established by
-// sweeping all 256 values on AN515-45, not copied from another driver.
-check('off plus six effects are exposed', EFFECTS.length === 7);
+// Six entries: Off plus five effects. Established by sweeping all 256 mode
+// values on AN515-45 rather than copied from another driver.
+check('off plus five effects are exposed', EFFECTS.length === 6);
 check('mode 0 is Off, not Static', EFFECTS[0]?.name === 'Off');
-check('mode 6 is offered; it works and was wrongly excluded',
-  EFFECTS.some((e) => e.mode === 6));
+// Writing 6,5,100,1,255,255,255 is accepted and lights nothing, so it must
+// not be offered. It was briefly added on a misread sweep result.
+check('mode 6 is not offered; it does not light',
+  !EFFECTS.some((e) => e.mode === 6));
 check('Off takes no colour', usesColour(0) === false);
 check('Off takes no speed', usesAnimation(0) === false);
 check('mode 5 is Zoom', EFFECTS[5]?.name === 'Zoom');
-check('mode 6 is Meteor', EFFECTS[6]?.name === 'Meteor');
 check('Breathing uses speed', usesAnimation(1) === true);
 check('Neon uses speed', usesAnimation(2) === true);
 
@@ -128,7 +129,7 @@ check('Zoom does not use direction', usesDirection(5) === false);
 
 check('Neon discards colour', usesColour(2) === false);
 check('Wave discards colour', usesColour(3) === false);
-check('Meteor uses colour', usesColour(6) === true);
+check('Zoom uses colour', usesColour(5) === true);
 check('Shifting uses colour', usesColour(4) === true);
 check('unknown mode falls back to the first entry', effectFor(99).name === 'Off');
 

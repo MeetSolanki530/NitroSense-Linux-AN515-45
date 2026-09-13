@@ -55,7 +55,7 @@ desktop can see. Both are covered in `patches/` for the AN515-45.
 | ⚡ Power modes (Quiet / Balanced / Performance) | works |
 | 🔋 Battery limit at 80% | works |
 | 🔌 USB charging while the lid is shut | works |
-| ⌨️ Keyboard lighting, 6 effects and off | works |
+| ⌨️ Keyboard lighting, 5 effects and off | works |
 | 💾 Lighting comes back after a reboot | works |
 | 🌡️ Live temps, fan RPM, CPU and GPU usage | works |
 | 🎹 NitroSense key opens the app | works |
@@ -72,7 +72,7 @@ The app shows them as unavailable instead of pretending.
 - **A fixed colour of your choosing.** The six effects work, but there is no
   static colour. Mode 0, which every other implementation calls Static, is
   really off: the firmware writes it straight into the EC's KBLE register and
-  0 means the backlight is off. All 256 values were swept and only 1 to 6
+  0 means the backlight is off. All 256 values were swept and only 1 to 5
   light, all of them animations. Per-zone colours do reach the hardware, they
   are just never displayed by anything. The same bug is open upstream for the
   AN515-58. Details and everything ruled out are in `docs-rgb-findings.md`.

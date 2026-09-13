@@ -57,7 +57,7 @@
  
      acpi_status status;
      union acpi_object *obj;
-@@ -4186,41 +4211,19 @@
+@@ -4186,41 +4211,18 @@
          return -EINVAL;
      }
  
@@ -66,8 +66,7 @@
 +     * speed for breathing, colour for neon, direction for zoom/meteor/
 +     * twinkling — and on AN515-45 that switched those effects off outright: a
 +     * breath at speed 0 parks at the dark end of its cycle, a neon at
-+     * rgb 0,0,0 is black. Passing every field through lights all six effects,
-+     * including mode 6, which the per-mode zeroing had made look dead.
++     * rgb 0,0,0 is black. Passing every field through lights all five effects.
 +     *
 +     * Mode 0 keeps its zeroing because it is off, not static, so the other
 +     * fields are meaningless there. */
@@ -109,7 +108,7 @@
      }
  
      status = set_kb_status(mode, speed, brightness, direction, red, green, blue);
-@@ -4268,30 +4271,72 @@
+@@ -4268,30 +4270,72 @@
      return AE_OK;
  }
  
@@ -168,7 +167,7 @@
 +     *
 +     * Mode 0 is not static. The firmware writes byte 0 straight into the EC's
 +     * KBLE register, and KBLE 0 means the backlight is off. Established by
-+     * sweeping all 256 values: only 1 to 6 light, and all six are animations
++     * sweeping all 256 values: only 1 to 5 light, and all five are animations
 +     * reading KBCR/KBCG/KBCB rather than the zone colours set above.
 +     *
 +     * So the zone writes land correctly, confirmed by reading KB1R..KB4B back
@@ -193,7 +192,7 @@
  
      current_kb_state.per_zone = 1;
  
-@@ -4485,6 +4530,7 @@
+@@ -4485,6 +4529,7 @@
  /* Four Zoned Keyboard Attributes */
  static struct device_attribute four_zoned_rgb_mode = __ATTR(four_zone_mode, 0644, four_zoned_rgb_kb_show, four_zoned_rgb_kb_store);
  static struct device_attribute per_zoned_rgb_mode = __ATTR(per_zone_mode, 0644, per_zoned_rgb_kb_show, per_zoned_rgb_kb_store);

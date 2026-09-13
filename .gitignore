@@ -35,3 +35,5 @@ yesterday/
 # Machine-specific firmware dumps: ACPI tables and EC register captures. Useful
 # while investigating, meaningless on anyone else's laptop.
 acpi/
+
+yesterday

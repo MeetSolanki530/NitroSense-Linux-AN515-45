@@ -11,18 +11,17 @@
  * hardware, not taken from another implementation:
  *
  *   0        off
- *   1 to 6   Breathing, Neon, Wave, Shifting, Zoom, Meteor
- *   7 to 255 nothing, the keyboard stays dark
+ *   1 to 5   Breathing, Neon, Wave, Shifting, Zoom
+ *   6 to 255 nothing, the keyboard stays dark
+ *
+ * Mode 6 was briefly added on a misread of a sweep result and taken back out:
+ * writing 6,5,100,1,255,255,255 is accepted and lights nothing.
  *
  * Mode 0 is off, not static. The firmware writes byte 0 of the payload
  * straight into the EC's KBLE register with no validation, and KBLE 0
  * switches the backlight off. Calling it Static, which every other
  * implementation does, produced an app that turned the keyboard off when the
  * user asked for a fixed colour.
- *
- * Mode 6 does work. It was previously written off as dead because it was
- * being sent with speed 0, which parks any animated effect at the dark end of
- * its cycle.
  *
  * per_zone_mode writes land correctly in the EC's KB1R..KB4B registers, but
  * no mode displays them: every effect reads KBCR/KBCG/KBCB instead. So there
@@ -92,8 +91,6 @@ export const EFFECTS: Effect[] = [
     note: 'The only effect that uses every input.' },
   { mode: 5, name: 'Zoom', usesColour: true, usesSpeed: true, usesDirection: false,
     note: 'Pulses out from the centre of the keyboard.' },
-  { mode: 6, name: 'Meteor', usesColour: true, usesSpeed: true, usesDirection: false,
-    note: 'Drops the colour down the keyboard. Needs a speed above zero.' },
 ];
 
 export function effectFor(mode: number): Effect {
@@ -191,7 +188,7 @@ export function parseFourZone(raw: unknown): FourZone | null {
 
   const [mode, speed, brightness, direction, red, green, blue] = parts as number[];
   return {
-    mode: clampInt(mode as number, 0, 6),
+    mode: clampInt(mode as number, 0, 5),
     speed: clampInt(speed as number, 0, 9),
     brightness: clampInt(brightness as number, 0, 100),
     // Anything outside 1-2 is meaningless; fall back to the daemon's default.
