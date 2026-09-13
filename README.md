@@ -56,6 +56,7 @@ desktop can see. Both are covered in `patches/` for the AN515-45.
 | 🔋 Battery limit at 80% | works |
 | 🔌 USB charging while the lid is shut | works |
 | ⌨️ Keyboard RGB, per zone and 6 effects | works |
+| 💾 Lighting comes back after a reboot | works |
 | 🌡️ Live temps, fan RPM, CPU and GPU usage | works |
 | 🎹 NitroSense key opens the app | works |
 

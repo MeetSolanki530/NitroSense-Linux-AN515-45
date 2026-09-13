@@ -29,6 +29,8 @@ done
 systemctl daemon-reload 2>/dev/null || true
 rm -f /var/run/nitrosense.sock
 rm -rf /opt/NitroSense/backend
+# Saved keyboard lighting. Written by the daemon, so it goes with the daemon.
+rm -rf /var/lib/nitrosense
 
 # ------------------------------------------------------------------ driver
 rm -f /etc/modules-load.d/$MODNAME.conf

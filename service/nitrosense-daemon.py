@@ -21,7 +21,7 @@ import traceback
 from pathlib import Path
 from enum import Enum
 from PowerSourceDetection import PowerSourceDetector 
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Optional, Tuple, Set
 # from KeyboardMonitor import KeyboardMonitor
 
 # Constants
@@ -31,6 +31,16 @@ LOG_PATH = "/var/log/nitrosense.log"
 CONFIG_PATH = "/etc/nitrosense/config.ini"
 PID_FILE = "/var/run/nitrosense.pid"
 MODPROBE_CONFIG_PATH = "/etc/modprobe.d/linuwu-sense.conf"
+
+# Last applied keyboard lighting, reapplied at startup.
+#
+# The keyboard controller keeps nothing across a power cycle: every boot it
+# comes back reporting ffffff on all four zones, and the sysfs reads are real
+# firmware queries rather than a cache, so there is no stored value anywhere to
+# recover. Something has to write the colour back, and this is the file it is
+# written back from. /var/lib rather than /etc because it is state the daemon
+# maintains, not configuration a user edits.
+LIGHTING_STATE_PATH = "/var/lib/nitrosense/lighting.json"
 
 # Acer ENEK5130 HID RGB controller used by newer Nitro/Predator models where
 # linuwu_sense exposes RGB sysfs files but color writes do not affect hardware.
@@ -81,6 +91,81 @@ file_handler = logging.handlers.RotatingFileHandler(
     LOG_PATH, maxBytes=1024*1024*5, backupCount=5)
 file_handler.setFormatter(formatter)
 log.addHandler(file_handler)
+
+def save_lighting(kind: str, values: Dict) -> None:
+    """Remember the lighting that was just applied.
+
+    Only one kind is stored, never both. Per-zone colours and a four-zone
+    effect are two ways of driving the same LEDs, so replaying both at startup
+    would mean the second silently overwriting the first, and which one you got
+    would depend on the order they happened to be written in. The last thing
+    applied is the thing the user is looking at, so that is what comes back.
+
+    Never raises. A daemon that dies because it could not write a convenience
+    file is worse than a keyboard that forgets its colour.
+    """
+    try:
+        os.makedirs(os.path.dirname(LIGHTING_STATE_PATH), exist_ok=True)
+        with open(LIGHTING_STATE_PATH, 'w') as f:
+            json.dump({"kind": kind, "values": values}, f, indent=2)
+    except Exception as e:
+        log.warning(f"Could not save lighting state: {e}")
+
+
+def load_lighting() -> Optional[Dict]:
+    """The last applied lighting, or None if there is nothing usable."""
+    try:
+        if not os.path.exists(LIGHTING_STATE_PATH):
+            return None
+        with open(LIGHTING_STATE_PATH) as f:
+            saved = json.load(f)
+    except Exception as e:
+        log.warning(f"Could not read lighting state: {e}")
+        return None
+
+    if not isinstance(saved, dict):
+        return None
+    if saved.get("kind") not in ("per_zone", "four_zone"):
+        return None
+    if not isinstance(saved.get("values"), dict):
+        return None
+    return saved
+
+
+def restore_lighting(manager) -> None:
+    """Write the remembered lighting back to the hardware.
+
+    Called once at startup, after the driver has been found. Every failure is
+    logged and swallowed: the setters validate their own arguments and return
+    False rather than raising, and a file written by an older version may not
+    carry the keys this one expects.
+    """
+    saved = load_lighting()
+    if not saved:
+        return
+
+    kind = saved["kind"]
+    v = saved["values"]
+    try:
+        if kind == "per_zone":
+            ok = manager.set_per_zone_mode(
+                v["zone1"], v["zone2"], v["zone3"], v["zone4"], v["brightness"])
+        else:
+            ok = manager.set_four_zone_mode(
+                v["mode"], v["speed"], v["brightness"], v["direction"],
+                v["red"], v["green"], v["blue"])
+    except KeyError as e:
+        log.warning(f"Saved lighting is missing {e}, ignoring it")
+        return
+    except Exception as e:
+        log.warning(f"Could not restore lighting: {e}")
+        return
+
+    if ok:
+        log.info(f"Restored {kind} lighting")
+    else:
+        log.warning(f"Hardware refused the saved {kind} lighting")
+
 
 class LaptopType(Enum):
     UNKNOWN = 0
@@ -1315,6 +1400,11 @@ class DaemonServer:
                 zone4 = params.get("zone4", "000000")
                 brightness = params.get("brightness", 100)
                 success = self.manager.set_per_zone_mode(zone1, zone2, zone3, zone4, brightness)
+                if success:
+                    save_lighting("per_zone", {
+                        "zone1": zone1, "zone2": zone2, "zone3": zone3,
+                        "zone4": zone4, "brightness": brightness,
+                    })
                 return {
                     "success": success,
                     "data": {
@@ -1343,6 +1433,12 @@ class DaemonServer:
                 green = params.get("green", 0)
                 blue = params.get("blue", 0)
                 success = self.manager.set_four_zone_mode(mode, speed, brightness, direction, red, green, blue)
+                if success:
+                    save_lighting("four_zone", {
+                        "mode": mode, "speed": speed, "brightness": brightness,
+                        "direction": direction,
+                        "red": red, "green": green, "blue": blue,
+                    })
                 return {
                     "success": success,
                     "data": {
@@ -1595,6 +1691,10 @@ class NitroSenseDaemon:
             # Log detected features
             features_str = ", ".join(sorted(self.manager.available_features))
             log.info(f"Detected features: {features_str}")
+
+            # After the features are known, so the setters can refuse cleanly
+            # on a machine where the keyboard is not there at all.
+            restore_lighting(self.manager)
 
             return True
         except Exception as e:
