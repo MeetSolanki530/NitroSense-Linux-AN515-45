@@ -131,7 +131,7 @@ Host github.com
 Safe to delete, all of it rebuilds or downloads again.
 
 ```bash
-rm -rf app/release app/logs docs/reference/acer-turbo
+rm -rf app/release app/logs acer-turbo ref-dmm
 rm -rf ~/.cache/electron
 rm -rf ~/.var/app/com.visualstudio.code/cache/electron-builder
 rm -rf app/node_modules    # costs you an npm install next time

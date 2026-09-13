@@ -32,6 +32,7 @@ export PATH="/usr/sbin:/sbin:/usr/bin:/bin:$PATH"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FACER_DIR="$PROJECT_ROOT/acer-turbo"
+FACER_URL="https://github.com/JafarAkhondali/acer-predator-turbo-and-rgb-keyboard-linux-module"
 KO="$FACER_DIR/src/facer.ko"
 
 red()   { printf '\033[31m%s\033[0m\n' "$*"; }
@@ -60,7 +61,19 @@ undo() {
 
 [ "${1:-}" = "--undo" ] && undo
 
-[ -f "$FACER_DIR/Makefile" ] || { red "facer source missing at $FACER_DIR"; exit 1; }
+# Fetched on demand rather than kept as a checkout in the project. This is a
+# comparison driver used to answer one question, not something the app needs,
+# so a stale clone sitting in the tree is worth more confusion than the few
+# seconds it takes to get it back.
+if [ ! -f "$FACER_DIR/Makefile" ]; then
+  command -v git >/dev/null 2>&1 || { red "git is needed to fetch facer"; exit 1; }
+  dim "  Fetching facer into $FACER_DIR…"
+  rm -rf "$FACER_DIR"
+  git clone --depth 1 "$FACER_URL" "$FACER_DIR" >/dev/null 2>&1 || {
+    red "  Could not clone facer from $FACER_URL"
+    exit 1
+  }
+fi
 
 head_ "Temporary facer load (nothing persistent is written)"
 
