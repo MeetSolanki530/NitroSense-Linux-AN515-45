@@ -95,7 +95,7 @@
      }
  
      status = set_kb_status(mode, speed, brightness, direction, red, green, blue);
-@@ -4246,30 +4244,65 @@
+@@ -4246,30 +4244,52 @@
      return AE_OK;
  }
  
@@ -150,20 +150,7 @@
      }
 -    /* set per_zone to 1*/
 +
-+    /* The mode switch has to carry a colour, not zeros. In static mode this
-+     * firmware paints the global RGB over the zones, so sending 0,0,0 here
-+     * blanks every colour set above and the keyboard goes dark. The symptom is
-+     * a keyboard that looks broken: the Fn brightness keys appear dead too,
-+     * because scaling black gives black at every level.
-+     *
-+     * Zone 1 is the colour to send. For the common case of one colour across
-+     * the keyboard it is exactly right, and where the zones differ the zones
-+     * themselves have already been written.
-+     */
-+    status = set_kb_status(0, 0, input->brightness, 0,
-+                           (input->zone1 >> 16) & 0xFF,
-+                           (input->zone1 >> 8) & 0xFF,
-+                           input->zone1 & 0xFF);
++    status = set_kb_status(0, 0, input->brightness, 0, 0, 0, 0);
 +    if (ACPI_FAILURE(status))
 +    {
 +        pr_err("Error setting KB status.\n");
