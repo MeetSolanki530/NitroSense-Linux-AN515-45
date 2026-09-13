@@ -64,6 +64,23 @@ need() {
 need build-essential command -v gcc
 need make command -v make
 
+# The driver needs the platform_profile device class, which arrived in 6.14.
+# Older kernels fail the build with a page of errors about platform_profile_ops
+# and BACKLIGHT_POWER_ON, which reads as something being wrong with the package
+# rather than the kernel being too old. Say it plainly instead.
+KERNEL_TOO_OLD=""
+kver_major=${KVER%%.*}
+kver_rest=${KVER#*.}
+kver_minor=${kver_rest%%.*}
+case "$kver_major$kver_minor" in
+  *[!0-9]*) : ;;   # unparseable, do not guess
+  *)
+    if [ "$kver_major" -lt 6 ] || { [ "$kver_major" -eq 6 ] && [ "$kver_minor" -lt 14 ]; }; then
+      KERNEL_TOO_OLD="yes"
+    fi
+    ;;
+esac
+
 # The app offers to start the background service for you, which needs a
 # desktop authorisation prompt. The package that provides pkexec was split out
 # of policykit-1 in polkit 122, so the name differs by release; suggest the one
@@ -183,6 +200,12 @@ install_driver() {
     warn "driver source missing; hardware controls will be unavailable"
     return 1
   fi
+  if [ -n "$KERNEL_TOO_OLD" ]; then
+    warn "this kernel ($KVER) is older than 6.14, which the driver needs"
+    warn "the app will install, but hardware controls stay unavailable"
+    warn "until you boot a newer kernel. See the summary below."
+    return 1
+  fi
   if [ ! -d "/lib/modules/$KVER/build" ]; then
     warn "kernel headers for $KVER not found"
     warn "install them, then run:  sudo dpkg-reconfigure nitrosense"
@@ -295,6 +318,22 @@ fi
 #
 # Last, so it is the part still on screen when apt finishes rather than being
 # scrolled away by the driver build.
+if [ -n "$KERNEL_TOO_OLD" ]; then
+  echo ""
+  echo "NitroSense: this kernel is too old"
+  echo ""
+  echo "  You are running $KVER. The driver needs 6.14 or newer, because it"
+  echo "  uses a kernel interface that did not exist before then. This is not"
+  echo "  something the package can work around."
+  echo ""
+  echo "  On Ubuntu 24.04, the newer kernel is one package away:"
+  echo ""
+  echo "    sudo apt install linux-generic-hwe-24.04"
+  echo ""
+  echo "  Reboot into it and the driver builds by itself. Until then the app"
+  echo "  opens but every hardware control stays unavailable."
+fi
+
 if [ -n "$MISSING" ]; then
   echo ""
   echo "NitroSense: some things are missing"

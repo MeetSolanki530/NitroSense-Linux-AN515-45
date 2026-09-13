@@ -7,6 +7,10 @@ On Linux you get none of it. This brings it back.
 
 > ⚠️ **Built and tested on the Acer Nitro AN515-45 only.**
 > Other Nitro models may work but nothing here is tested on them.
+>
+> ⚠️ **Needs Linux 6.14 or newer.** Check with `uname -r`. Ubuntu 24.04 ships
+> 6.8, which is too old; see [Install](#-install) for the one command that
+> fixes it.
 
 ## 💻 Tested on
 
@@ -198,6 +202,23 @@ You need kernel headers, gcc and make. On Ubuntu based systems:
 ```bash
 sudo apt install linux-headers-$(uname -r) build-essential
 ```
+
+### You need kernel 6.14 or newer
+
+Check with `uname -r`. The driver uses a kernel interface that only exists
+from 6.14, so on anything older it cannot build at all. There is no way round
+this from our side.
+
+Ubuntu 24.04 ships 6.8 by default, which is too old. The newer kernel is one
+package away:
+
+```bash
+sudo apt install linux-generic-hwe-24.04
+```
+
+Reboot into it and the driver builds by itself. The installer checks this and
+tells you if your kernel is too old, rather than leaving you with a page of
+compiler errors.
 
 ### If the install fails downloading something
 
