@@ -189,7 +189,8 @@ Grab the `.deb` from [Releases](../../releases) and install it:
 sudo apt install ./nitrosense_*_amd64.deb
 ```
 
-That is all. The installer builds the kernel driver for your kernel, sets the
+That is all. The installer builds the kernel driver for your kernel, registers
+it with DKMS so it gets rebuilt whenever you install a new kernel, sets the
 background service to start at boot, and adds the app to your menu.
 
 You need kernel headers, gcc and make. On Ubuntu based systems:
@@ -197,6 +198,36 @@ You need kernel headers, gcc and make. On Ubuntu based systems:
 ```bash
 sudo apt install linux-headers-$(uname -r) build-essential
 ```
+
+### If the install fails downloading something
+
+apt pulls in `dkms` and the kernel headers alongside the app, and it gives up
+on the whole install if it cannot download them. So a slow or unreachable
+mirror looks like the app failing to install when nothing is wrong with it.
+
+If you see connection timeouts, try forcing IPv4:
+
+```bash
+sudo apt -o Acquire::ForceIPv4=true install ./nitrosense_*_amd64.deb
+```
+
+If you have no network at all, this skips the extras and installs anyway:
+
+```bash
+sudo apt install --no-install-recommends ./nitrosense_*_amd64.deb
+```
+
+The app still works that way. You only lose the automatic rebuild on kernel
+updates, so install `dkms` later and run `sudo dpkg-reconfigure nitrosense`.
+
+### Secure Boot
+
+Secure Boot only loads kernel modules signed with a key your machine trusts,
+and this one is compiled on your machine, so it is not signed by anyone yet.
+If the driver builds but will not load, that is usually why. The installer
+tells you when it detects this. You can either enrol a signing key, which
+`dkms` and `shim-signed` set up and prompt you for at the next reboot, or turn
+Secure Boot off in the firmware settings.
 
 ### First launch
 
