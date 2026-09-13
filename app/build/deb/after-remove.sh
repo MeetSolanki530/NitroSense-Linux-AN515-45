@@ -13,6 +13,9 @@ MODNAME="linuwu_sense"
 KVER="$(uname -r)"
 MDIR="/lib/modules/$KVER/kernel/drivers/platform/x86"
 
+DKMS_NAME="linuwu-sense"
+DKMS_VER="0.2.0"
+
 echo "NitroSense: removing hardware support"
 
 # ------------------------------------------------------------------ service
@@ -35,6 +38,15 @@ rm -rf /var/lib/nitrosense
 # ------------------------------------------------------------------ driver
 rm -f /etc/modules-load.d/$MODNAME.conf
 rm -f /etc/modprobe.d/blacklist-acer_wmi.conf
+
+# Unregister from DKMS before deleting anything it owns. Skipping this leaves a
+# registered-but-sourceless module that fails every subsequent kernel upgrade
+# with an error naming a package the user no longer has installed.
+if command -v dkms >/dev/null 2>&1; then
+  dkms remove -m "$DKMS_NAME" -v "$DKMS_VER" --all >/dev/null 2>&1 || true
+fi
+rm -rf "/usr/src/$DKMS_NAME-$DKMS_VER"
+
 rm -f "$MDIR/$MODNAME.ko"
 depmod -a "$KVER" 2>/dev/null || true
 

@@ -21,8 +21,9 @@
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test-validate.ts && node scripts/test-telemetry.ts && node scripts/test-home.ts && node scripts/test-format.ts && node scripts/test-keyboard.ts && node scripts/test-series.ts && node scripts/test-cpupower.ts",
     "test:e2e": "node scripts/test-writes.ts && node scripts/test-fan-sync.ts",
-    "package": "npm run build && electron-builder --linux dir deb",
-    "package:dir": "npm run build && electron-builder --linux dir",
+    "check:driver": "../scripts/check-driver-patches.sh",
+    "package": "npm run check:driver && npm run build && electron-builder --linux dir deb",
+    "package:dir": "npm run check:driver && npm run build && electron-builder --linux dir",
     "daemon:dev": "echo \"Run with sudo:  sudo ./scripts/run-daemon-dev.sh\""
   },
   "devDependencies": {
@@ -78,6 +79,10 @@
         "filter": [
           "*.py"
         ]
+      },
+      {
+        "from": "../packaging/dkms.conf",
+        "to": "backend/driver/dkms.conf"
       }
     ],
     "linux": {
@@ -116,6 +121,11 @@
         "python3",
         "make",
         "gcc"
+      ],
+      "recommends": [
+        "dkms",
+        "linux-headers-generic",
+        "pkexec | policykit-1"
       ]
     }
   }
