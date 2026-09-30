@@ -29,8 +29,8 @@ check() {
 package() {
   cd "$srcdir/nitrosense"
   install -d "$pkgdir/opt/nitrosense/resources/app"
-  cp -a app/node_modules/electron/dist/. "$pkgdir/opt/nitrosense/"
-  cp -a app/dist app/dist-electron app/package.json "$pkgdir/opt/nitrosense/resources/app/"
+  cp -a --no-preserve=ownership app/node_modules/electron/dist/. "$pkgdir/opt/nitrosense/"
+  cp -a --no-preserve=ownership app/dist app/dist-electron app/package.json "$pkgdir/opt/nitrosense/resources/app/"
   install -Dm755 "$srcdir/nitrosense-launcher" "$pkgdir/usr/bin/nitrosense"
   install -Dm644 "$srcdir/nitrosense.desktop" "$pkgdir/usr/share/applications/nitrosense.desktop"
   install -Dm644 app/build/icons/256x256.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/nitrosense.png"
