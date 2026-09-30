@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=NitroSense Linux
+Comment=Fan, battery and keyboard controls
+Exec=nitrosense
+Icon=nitrosense
+Terminal=false
+Categories=Settings;HardwareSettings;
+StartupWMClass=nitrosense

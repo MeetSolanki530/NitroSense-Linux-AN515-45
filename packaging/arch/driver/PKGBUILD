@@ -1,0 +1,53 @@
+# Experimental local recipe. Compile success is not hardware validation.
+# Licensing metadata is provisional; resolve upstream GPL notices before distribution.
+pkgname=linuwu-sense-an51545-dkms
+pkgver=0.2.0.r1
+pkgrel=1
+pkgdesc='Patched Linuwu-Sense for Acer Nitro AN515-45 (experimental)'
+arch=('x86_64')
+url='https://github.com/PXDiv/Div-Linuwu-Sense'
+license=('GPL-2.0-or-later')
+depends=('dkms')
+makedepends=('git')
+optdepends=('linux-cachyos-headers: main kernel builds' 'linux-cachyos-lts-headers: LTS builds' 'clang: Clang-built kernels' 'lld: Clang-built kernels')
+conflicts=('linuwu-sense-dkms' 'linuwu-sense-git')
+source=("driver::git+https://github.com/PXDiv/Div-Linuwu-Sense#commit=d8ea437d847268dd9fe2a49ae28d0723dd720968"
+  'linuwu-sense-an515-45-rgb.patch'
+  'linuwu-sense-misc-setting-status.patch'
+  'linuwu-sense-backlight-timeout-decode.patch'
+  'kernel-string-copy.patch'
+  'dkms.conf'
+  'build-module.sh'
+  'activate-driver.sh'
+  'restore-stock-driver.sh'
+  'nitrosense-driver.service'
+)
+sha256sums=('SKIP'
+  '2d39595468f24a1b4d659cf82657e1d81ccacaf07e18de98f87e5b66d9ee53ff'
+  '547a9e090b3e025511fcf1f63cff57d3b5f1b7e3a57b6a242eda5e16e88e4d16'
+  '20111bfcd2a7d95d81044d80d2c32185325ee813a64817c03954b3bf1a76c70c'
+  '6d2459384afec452dd612653d2f52f177bff08bff41b638025c1a5cd980774e2'
+  '0ec5333310e93da5303adf572735a7e00d3394d4e112a81fba780f83875ab9cf'
+  'c489f1be4c4ed84eeabd4ddc3be333060c2f2a2f89d7635ef3c4430239d536d6'
+  'cfd9f2d3f1d078bdc2670d5d38306ede6f3f42f0aa457519c15b66a6dac19ddd'
+  '93b0434fe6c201d9bda13f78f5756002ddcfedcfc26955377e29a5fd6a5a1f2a'
+  'dee520d32be67a6f20b935310f837b8e7de6c3f729613953dd0aefe33495f51c'
+)
+prepare() {
+  cd "$srcdir/driver"
+  for patch in linuwu-sense-an515-45-rgb.patch linuwu-sense-misc-setting-status.patch linuwu-sense-backlight-timeout-decode.patch kernel-string-copy.patch; do
+    git apply "$srcdir/$patch"
+  done
+}
+package() {
+  local dest="$pkgdir/usr/src/linuwu-sense-an51545-$pkgver"
+  install -Dm644 "$srcdir/driver/src/linuwu_sense.c" "$dest/src/linuwu_sense.c"
+  install -Dm644 "$srcdir/driver/Makefile" "$dest/Makefile"
+  install -Dm644 "$srcdir/dkms.conf" "$dest/dkms.conf"
+  install -Dm755 "$srcdir/build-module.sh" "$dest/build-module.sh"
+  install -Dm644 "$srcdir/driver/LICENSE" "$dest/LICENSE"
+  install -Dm755 "$srcdir/activate-driver.sh" "$pkgdir/usr/lib/nitrosense/activate-driver.sh"
+  install -Dm755 "$srcdir/restore-stock-driver.sh" "$pkgdir/usr/lib/nitrosense/restore-stock-driver.sh"
+  install -Dm644 "$srcdir/nitrosense-driver.service" "$pkgdir/usr/lib/systemd/system/nitrosense-driver.service"
+}
+# Service is shipped disabled; package installation does not load or blacklist drivers.

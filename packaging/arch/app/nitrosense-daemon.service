@@ -1,0 +1,24 @@
+[Unit]
+Description=NitroSense hardware service
+After=systemd-modules-load.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python /usr/lib/nitrosense/nitrosense-daemon.py
+Environment=NITROSENSE_SOCKET=/run/nitrosense/control.sock
+Environment=NITROSENSE_SOCKET_GROUP=nitrosense
+Environment=NITROSENSE_RESTORE_SETTINGS=0
+Environment=NITROSENSE_AUTO_POWER=0
+Environment=NITROSENSE_DRIVER_RECONFIGURE=0
+RuntimeDirectory=nitrosense
+RuntimeDirectoryMode=0755
+StateDirectory=nitrosense
+UMask=0077
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

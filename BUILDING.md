@@ -147,12 +147,18 @@ is bumped. Pure cache, nothing lives in there.
 live in `patches/` instead.
 
 ```bash
-git clone https://github.com/0x7375646F/Linuwu-Sense Linuwu-Sense
+git clone https://github.com/PXDiv/Div-Linuwu-Sense Linuwu-Sense
 cd Linuwu-Sense
 git apply ../patches/linuwu-sense-an515-45-rgb.patch
 git apply ../patches/linuwu-sense-misc-setting-status.patch
+git apply ../patches/linuwu-sense-backlight-timeout-decode.patch
 ```
 
-Both apply cleanly to a fresh checkout. If they stop applying after an upstream
+All three apply cleanly to a fresh checkout. If they stop applying after an upstream
 change, that is the thing to fix before anything else, because the RGB will look
 like it works and quietly do nothing.
+
+## Arch and CachyOS
+
+See [packaging/arch/README.md](packaging/arch/README.md) for source packages,
+KDE setup, DKMS rebuilds and the tested hardware matrix.
