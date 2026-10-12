@@ -1,0 +1,6 @@
+**/src/
+**/pkg/
+**/driver/driver/
+*.pkg.tar.*
+app/PKGBUILD
+app/nitrosense-source.tar.gz

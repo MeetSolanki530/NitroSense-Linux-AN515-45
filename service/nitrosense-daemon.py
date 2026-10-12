@@ -14,6 +14,7 @@ import glob
 import logging
 import logging.handlers
 import socket
+from socket_policy import configure_socket
 import threading
 import signal
 import configparser
@@ -26,7 +27,10 @@ from typing import Dict, List, Optional, Tuple, Set
 
 # Constants
 VERSION = "0.5.2"
-SOCKET_PATH = "/var/run/nitrosense.sock"
+SOCKET_PATH = os.environ.get("NITROSENSE_SOCKET", "/var/run/nitrosense.sock")
+RESTORE_SETTINGS = os.environ.get("NITROSENSE_RESTORE_SETTINGS", "1") == "1"
+AUTO_POWER = os.environ.get("NITROSENSE_AUTO_POWER", "1") == "1"
+ALLOW_DRIVER_RECONFIGURE = os.environ.get("NITROSENSE_DRIVER_RECONFIGURE", "1") == "1"
 LOG_PATH = "/var/log/nitrosense.log"
 CONFIG_PATH = "/etc/nitrosense/config.ini"
 PID_FILE = "/var/run/nitrosense.pid"
@@ -340,7 +344,7 @@ class HardwareManager:
         time.sleep(0.2)
 
         # If unknown laptop type detected, try restarting drivers (with limit)
-        if self.laptop_type == LaptopType.UNKNOWN:
+        if self.laptop_type == LaptopType.UNKNOWN and ALLOW_DRIVER_RECONFIGURE:
             current_attempts = self._get_restart_attempts()
             
             if current_attempts < self.MAX_RESTART_ATTEMPTS:
@@ -1266,9 +1270,13 @@ class DaemonServer:
 
         try:
             self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self.socket.bind(SOCKET_PATH)
+            previous_umask = os.umask(0o077)
+            try:
+                self.socket.bind(SOCKET_PATH)
+            finally:
+                os.umask(previous_umask)
             # Ensure socket permissions allow non-root access
-            os.chmod(SOCKET_PATH, 0o666)
+            configure_socket(SOCKET_PATH, os.environ.get("NITROSENSE_SOCKET_GROUP"))
             self.socket.listen(5)
             self.socket.settimeout(1)  # 1 second timeout for clean shutdown
             self.running = True
@@ -1377,6 +1385,10 @@ class DaemonServer:
         log.info(f"Processing command: {command} with params: {params}")
 
         try:
+            if not isinstance(command, str) or not isinstance(params, dict):
+                return {"success": False, "error": "Invalid command envelope"}
+            if not ALLOW_DRIVER_RECONFIGURE and (command.startswith(("force_", "set_modprobe_", "remove_modprobe_", "restart_"))):
+                return {"success": False, "error": "Driver reconfiguration is disabled by the service configuration"}
             if command == "get_all_settings":
                 settings = self.manager.get_all_settings()
                 return {
@@ -1851,12 +1863,14 @@ class NitroSenseDaemon:
 
             # After the features are known, so the setters can refuse cleanly
             # on a machine where the hardware is not there at all.
-            restore_lighting(self.manager)
-            restore_fan(self.manager)
+            if RESTORE_SETTINGS:
+                restore_lighting(self.manager)
+                restore_fan(self.manager)
             # Governor and EPP only. The fan duty that came with the mode was
             # written through set_fan_speed at the time, so fan.json already
             # holds it and restore_fan above has put it back.
-            restore_power_mode()
+            if RESTORE_SETTINGS:
+                restore_power_mode()
 
             return True
         except Exception as e:
@@ -1887,7 +1901,8 @@ class NitroSenseDaemon:
         try:
             self.running = True
             self.server = DaemonServer(self.manager)
-            self.power_monitor.start_monitoring()
+            if AUTO_POWER:
+                self.power_monitor.start_monitoring()
             self.server.start()
             # Start keyboard monitoring
             

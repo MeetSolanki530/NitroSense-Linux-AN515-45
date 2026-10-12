@@ -1,0 +1,14 @@
+[Unit]
+Description=Activate tested NitroSense driver with stock-driver fallback
+After=systemd-modules-load.service
+Before=nitrosense-daemon.service
+ConditionPathExists=/sys/class/dmi/id/product_name
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/nitrosense/activate-driver.sh
+RemainAfterExit=yes
+TimeoutStartSec=45
+
+[Install]
+WantedBy=multi-user.target

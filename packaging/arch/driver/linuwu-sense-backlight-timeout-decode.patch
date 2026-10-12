@@ -1,0 +1,57 @@
+--- a/src/linuwu_sense.c
++++ b/src/linuwu_sense.c
+@@ -111,6 +111,25 @@
+ #define ACER_GAMING_MISC_SETTING_INDEX_MASK GENMASK_ULL(7, 0)
+ #define ACER_GAMING_MISC_SETTING_VALUE_MASK GENMASK_ULL(15, 8)
+ 
++/*
++ * Keyboard backlight idle timeout, as GET 0x88401 returns it.
++ *
++ * The reply carries the timeout in whole seconds in the high field and echoes
++ * the function selector in the low word. Upstream compared the whole 64-bit
++ * word against two constants taken from a Predator, which recognises exactly
++ * one timeout value (30s) and reports every other reply as -1 "unreadable".
++ *
++ * Measured on an AN515-45 (Nitro):
++ *   as shipped        0x210000080000   33 seconds  -> upstream said -1
++ *   after writing 1   0x1E0000080000   30 seconds  -> upstream said 1
++ *   after writing 0   0x000000080000    0 seconds  -> upstream said 0
++ *
++ * So the field is a duration, not an enum, and any nonzero duration means the
++ * timeout is on. Decoding the field instead of matching constants makes the
++ * read correct for whatever value the firmware happens to be holding.
++ */
++#define ACER_BACKLIGHT_TIMEOUT_SECONDS_MASK GENMASK_ULL(63, 40)
++
+ #define ACER_PREDATOR_V4_RETURN_STATUS_BIT_MASK GENMASK_ULL(7, 0)
+ #define ACER_PREDATOR_V4_SENSOR_INDEX_BIT_MASK GENMASK_ULL(15, 8)
+ #define ACER_PREDATOR_V4_SENSOR_READING_BIT_MASK GENMASK_ULL(23, 8)
+@@ -3855,6 +3874,14 @@
+         return -ENODEV;
+     }
+     pr_info("lcd override get status: %llu\n", result);
++    /*
++     * Unlike backlight_timeout, the -1 here is not a decode gap. The reply's
++     * bits 55:48 carry the state: 0x01 enabled, 0x00 disabled. An AN515-45
++     * returns 0x00FF000001000000, i.e. 0xFF in that byte, and it stays 0xFF
++     * across writes that each report success. 0xFF is the firmware's "not
++     * applicable on this model", so the setting really is absent rather than
++     * merely unreadable, and -1 is the honest answer.
++     */
+     return sprintf(buf, "%d\n", result == 0x1000001000000 ? 1 : result == 0x1000000 ? 0
+                                                                                     : -1);
+ }
+@@ -3894,8 +3921,11 @@
+         return -ENODEV;
+     }
+     pr_info("backlight_timeout get status: %llu\n", result);
+-    return sprintf(buf, "%d\n", result == 0x1E0000080000 ? 1 : result == 0x80000 ? 0
+-                                                                                 : -1);
++    /* Nonzero idle duration means the timeout is enabled. See
++     * ACER_BACKLIGHT_TIMEOUT_SECONDS_MASK for why this is a field read rather
++     * than the constant comparison it replaced. */
++    return sprintf(buf, "%d\n",
++                   FIELD_GET(ACER_BACKLIGHT_TIMEOUT_SECONDS_MASK, result) ? 1 : 0);
+ }
+ 
+ static ssize_t predator_backlight_timeout_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)

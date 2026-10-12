@@ -1,0 +1,35 @@
+--- a/src/linuwu_sense.c
++++ b/src/linuwu_sense.c
+@@ -3642,7 +3642,9 @@
+     char *token;
+     char *input_ptr = input;
+     size_t len = min(count, sizeof(input) - 1);
+-    strncpy(input, buf, len);
++    if (!len)
++        return -EINVAL;
++    memcpy(input, buf, len);
+ 
+     if (input[len - 1] == '\n')
+     {
+@@ -4213,7 +4215,9 @@
+     char *input_ptr = input_buf;
+     size_t len = min(count, sizeof(input_buf) - 1);
+ 
+-    strncpy(input_buf, buf, len);
++    if (!len)
++        return -EINVAL;
++    memcpy(input_buf, buf, len);
+ 
+     if (input_buf[len - 1] == '\n')
+     {
+@@ -4426,7 +4430,9 @@
+     struct per_zone_color colors;
+     char *input_ptr = str_buf;
+     len = min(count, sizeof(str_buf) - 1);
+-    strncpy(str_buf, buf, len);
++    if (!len)
++        return -EINVAL;
++    memcpy(str_buf, buf, len);
+     if (str_buf[len - 1] == '\n')
+     {
+         str_buf[len - 1] = '\0';

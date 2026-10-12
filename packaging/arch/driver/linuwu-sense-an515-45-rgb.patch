@@ -1,0 +1,259 @@
+--- a/src/linuwu_sense.c
++++ b/src/linuwu_sense.c
+@@ -545,7 +545,10 @@
+     .four_zone_kb = 1,
+ };
+ 
+- static struct quirk_entry quirk_acer_nitro_anv16_41 = {
++/* Declared upstream but never added to the DMI table, so it is dead code and
++ * the compiler warns on every build. Marked rather than deleted: the entry is
++ * presumably waiting on someone with that model to wire it up. */
++static struct quirk_entry __maybe_unused quirk_acer_nitro_anv16_41 = {
+     .nitro_v4 = 1,
+     .four_zone_kb = 0,
+  };
+@@ -560,6 +563,15 @@
+     .four_zone_kb = 1,
+  };
+ 
++/* This model does have a four-zone keyboard; it lights once the per-zone
++ * write uses the 4-byte payload. Declaring it here exposes four_zoned_kb
++ * without enable_all, which would also force the predator quirks and change
++ * how the Fn+F9/F10 backlight keys are decoded. */
++static struct quirk_entry quirk_acer_nitro_an515_45 = {
++    .nitro_v4 = 1,
++    .four_zone_kb = 1,
++};
++
+ 
+ static struct quirk_entry quirk_acer_nitro = {
+     .nitro_sense = 1,
+@@ -669,6 +681,15 @@
+     },
+     {
+          .callback = dmi_matched,
++         .ident = "Acer Nitro AN515-45",
++         .matches = {
++             DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
++             DMI_MATCH(DMI_PRODUCT_NAME, "Nitro AN515-45"),
++         },
++         .driver_data = &quirk_acer_nitro_an515_45,
++    },
++    {
++         .callback = dmi_matched,
+          .ident = "Acer Nitro AN515-46",
+          .matches = {
+              DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+@@ -4004,11 +4025,47 @@
+     u8 gmOutput[15];
+ } __packed;
+ 
++/* Wake the four-zone panel up. Without this it accepts every colour write and
++ * lights nothing, which is what made static look broken on AN515-45: writes
++ * succeeded at every layer, the colours landed correctly in the EC's
++ * KB1R..KB4B registers, and the keyboard stayed dark.
++ *
++ * Two calls, both taken from facer, which is the one driver known to light
++ * this model:
++ *
++ *   GetGamingSysInfo, apparently required before the panel will respond.
++ *   facer's comment says the same, for AN515-57.
++ *
++ *   SetGamingLED with 8 | (15 << 40). Byte 0 is ACER_GAMING_KBL_SET_ON, BIT(3)
++ *   in the mainline acer-wmi RFC, and bits 40 to 43 are the zone mask, its
++ *   ACER_GAMING_KBL_SET_ALL_ZONES. Both halves matter: sending the 15 in byte
++ *   1 rather than byte 5 is accepted and does nothing.
++ *
++ * Called from probe and again before every user-initiated write, because the
++ * panel can be handed back to the EC in between — clearing PSEE does that, and
++ * so does a power cycle. It is two WMI calls and idempotent.
++ *
++ * Return values are ignored on purpose: a model that does not implement these
++ * should still get its sysfs files.
++ */
++static void enable_four_zone_kb(void)
++{
++    u64 sysinfo = 0;
++
++    WMI_gaming_execute_u64(ACER_WMID_GET_GAMING_SYS_INFO_METHODID, 0, &sysinfo);
++    WMI_gaming_execute_u64(ACER_WMID_SET_GAMING_LED_METHODID,
++                           8ULL | (15ULL << 40), NULL);
++}
++
+ static acpi_status set_kb_status(int mode, int speed, int brightness,
+                                  int direction, int red, int green, int blue)
+ {
+     u64 resp = 0;
+-    u8 gmInput[16] = {mode, speed, brightness, 0, direction, red, green, blue, 3, 1, 0, 0, 0, 0, 0, 0};
++    /* Byte 8 must be 0, and byte 3 carries a wave-only flag. With byte 8 set
++     * to 3 the AN515-45 firmware accepts this call, reports success, and does
++     * nothing. facer sends 0 here and the keyboard lights. */
++    u8 gmInput[16] = {mode, speed, brightness, (mode == 3) ? 8 : 0,
++                      direction, red, green, blue, 0, 1, 0, 0, 0, 0, 0, 0};
+ 
+     acpi_status status;
+     union acpi_object *obj;
+@@ -4186,43 +4243,25 @@
+         return -EINVAL;
+     }
+ 
+-    switch (mode)
++    /* Only mode 0 is normalised. This driver used to zero fields per mode —
++     * speed for breathing, colour for neon, direction for zoom/meteor/
++     * twinkling — and on AN515-45 that switched those effects off outright: a
++     * breath at speed 0 parks at the dark end of its cycle, a neon at
++     * rgb 0,0,0 is black. Passing every field through lights all five effects.
++     *
++     * Static keeps its zeroing, which is correct for it and is what facer
++     * sends for static too. */
++    if (mode == 0x0)
+     {
+-    case 0x0: // Static mode: Ignore speed and direction
+-        speed = 0;
+-        direction = 0;
+-        break;
+-    case 0x1: // Breathing mode: Ignore speed
+         speed = 0;
+         direction = 0;
+-        break;
+-    case 0x2: // Neon mode: Ignore red, green, blue, and direction
+-        red = 0;
+-        green = 0;
+-        blue = 0;
+-        direction = 0;
+-        break;
+-    case 0x3: // Wave mode: Ignore red, green, and blue
+-        red = 0;
+-        green = 0;
+-        blue = 0;
+-        break;
+-    case 0x4: // Shifting mode: No restrictions (all values allowed)
+-        break;
+-    case 0x5: // Zoom mode: Ignore direction
+-        direction = 0;
+-        break;
+-    case 0x6: // Meteor mode: Ignore direction
+-        direction = 0;
+-        break;
+-    case 0x7: // Twinkling mode: Ignore direction
+-        direction = 0;
+-        break;
+-    default:
+-        pr_err("Invalid mode value.\n");
+-        return -EINVAL;
+     }
+ 
++    /* Same reasoning as the per-zone store: the panel may have been handed
++     * back to the EC since the last write, and an effect into a disabled
++     * panel is accepted and lights nothing. */
++    enable_four_zone_kb();
++
+     status = set_kb_status(mode, speed, brightness, direction, red, green, blue);
+     if (ACPI_FAILURE(status))
+     {
+@@ -4268,30 +4307,68 @@
+     return AE_OK;
+ }
+ 
++/* The firmware expects exactly these four bytes. Passing the same fields as
++ * an 8-byte u64 (what this driver did) is accepted and silently ignored on
++ * AN515-45; four bytes works, which is what facer sends. */
++struct led_zone_set_param
++{
++    u8 zone;
++    u8 red;
++    u8 green;
++    u8 blue;
++} __packed;
++
++static acpi_status set_zone_color(u8 zone_mask, u8 red, u8 green, u8 blue)
++{
++    struct led_zone_set_param param = {
++        .zone = zone_mask, .red = red, .green = green, .blue = blue};
++    struct acpi_buffer input = {(acpi_size)sizeof(param), &param};
++
++    return wmi_evaluate_method(WMID_GUID4, 0,
++                               ACER_WMID_SET_GAMING_RGB_KB_METHODID, &input, NULL);
++}
++
+ static acpi_status set_per_zone_color(struct per_zone_color *input)
+ {
+     acpi_status status;
+-    u64 *zones[] = {&input->zone1, &input->zone2, &input->zone3, &input->zone4};
++    u64 zones[] = {input->zone1, input->zone2, input->zone3, input->zone4};
+     u8 zone_ids[] = {0x1, 0x2, 0x4, 0x8};
+ 
++    /* ORDER IS LOAD-BEARING: mode switch first, zone colours last.
++     *
++     * set_kb_status(0, ...) writes KBLE = 0, which switches the backlight off.
++     * The zone writes are what light it again, so they have to come after. If
++     * the colours go first, this call lands last and the keyboard goes dark
++     * with the colours sitting correctly in KB1R..KB4B, unread.
++     *
++     * That is what a reversal of this order did on AN515-45: static appeared
++     * to stop working entirely, the Fn brightness keys looked dead with it,
++     * and it survived reboots because this call also sets PSEE, which hands
++     * the lighting from the EC to software and is never cleared again.
++     *
++     * Both halves matter. Upstream has this order but sends the zone colours
++     * as an 8-byte u64, which this firmware ignores; the 4-byte form below is
++     * what makes them land. Upstream order plus the 4-byte payload is the
++     * combination that works, and it is easy to break by changing either one
++     * on its own.
++     */
+     status = set_kb_status(0, 0, input->brightness, 0, 0, 0, 0);
+     if (ACPI_FAILURE(status))
+     {
+         pr_err("Error setting KB status.\n");
+-        return -ENODEV;
++        return status;
+     }
+ 
+     for (int i = 0; i < 4; i++)
+     {
+-        *zones[i] = (cpu_to_be64(*zones[i]) >> 32) | zone_ids[i];
+-        status = WMI_gaming_execute_u64(ACER_WMID_SET_GAMING_RGB_KB_METHODID, *zones[i], NULL);
++        status = set_zone_color(zone_ids[i], (zones[i] >> 16) & 0xFF,
++                                (zones[i] >> 8) & 0xFF, zones[i] & 0xFF);
+         if (ACPI_FAILURE(status))
+         {
+             pr_err("Error setting KB color (zone %d): %s\n", i + 1, acpi_format_exception(status));
+             return status;
+         }
+     }
+-    /* set per_zone to 1*/
+ 
+     current_kb_state.per_zone = 1;
+ 
+@@ -4354,6 +4431,13 @@
+         return -EINVAL;
+     }
+ 
++    /* Enable first, every time. Probe does this too, but the panel can be
++     * handed back to the EC afterwards — clearing PSEE does it, and so does a
++     * power cycle — and a write into a panel that is not enabled is accepted
++     * and lights nothing. Two WMI calls is a cheap price for never being in
++     * that state. */
++    enable_four_zone_kb();
++
+     /* set per zone colors */
+     status = set_per_zone_color(&colors);
+     if (ACPI_FAILURE(status))
+@@ -4485,6 +4569,7 @@
+ /* Four Zoned Keyboard Attributes */
+ static struct device_attribute four_zoned_rgb_mode = __ATTR(four_zone_mode, 0644, four_zoned_rgb_kb_show, four_zoned_rgb_kb_store);
+ static struct device_attribute per_zoned_rgb_mode = __ATTR(per_zone_mode, 0644, per_zoned_rgb_kb_show, per_zoned_rgb_kb_store);
++
+ static struct attribute *four_zoned_kb_attrs[] = {
+     &four_zoned_rgb_mode.attr,
+     &per_zoned_rgb_mode.attr,
+@@ -4555,6 +4640,9 @@
+     }
+ 
+     if(quirks->four_zone_kb || enable_all){
++        /* Enable before the sysfs files exist, so nothing can write into a
++         * panel that has not been switched on yet. */
++        enable_four_zone_kb();
+         err = sysfs_create_group(&device->dev.kobj, &four_zoned_kb_attr_group);
+         if (err)
+             goto error_four_zone;

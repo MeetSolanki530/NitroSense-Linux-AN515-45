@@ -100,6 +100,9 @@ function run(cmd: string, args: string[]): Promise<string> {
 
 /** gsettings is absent outside GNOME-family sessions; treat that as "cannot". */
 export async function available(): Promise<boolean> {
+  if ((process.env.XDG_CURRENT_DESKTOP ?? '').split(':').some((name) => name.toLowerCase() === 'kde')) {
+    return false;
+  }
   try {
     await run('gsettings', ['get', SCHEMA, 'custom-keybindings']);
     return true;
